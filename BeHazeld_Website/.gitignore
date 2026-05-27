@@ -1,0 +1,49 @@
+# Environment files
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+frontend/.env.local
+frontend/.env.*.local
+
+# Python
+.venv/
+venv/
+backend/.venv/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Backend local databases and backups
+backend/store.db
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+backend/*.backup
+
+# Dev logs
+frontend/.logs/
+*.log
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/tsconfig.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/

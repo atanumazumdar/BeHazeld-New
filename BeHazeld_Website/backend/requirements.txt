@@ -1,0 +1,27 @@
+# Core API
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+
+# Database + migrations
+sqlalchemy>=2.0.0
+alembic>=1.18.0
+
+# MS SQL Server driver  — Windows Server / IIS deployment
+# Requires "ODBC Driver 18 for SQL Server" installed on the host
+pyodbc>=5.1.0
+
+# Validation
+pydantic>=2.11.0
+pydantic-settings>=2.5.0
+email-validator>=2.2.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+
+# Image uploads — Cloudinary
+cloudinary>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+python-multipart>=0.0.9
