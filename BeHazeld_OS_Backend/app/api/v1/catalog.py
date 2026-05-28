@@ -52,7 +52,9 @@ async def import_master_data(
     ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
     db: Session = Depends(get_db),
 ) -> MasterDataImportResponse:
-    if not file.filename or not file.filename.lower().endswith(".csv"):
+    is_csv_filename = bool(file.filename and file.filename.lower().endswith(".csv"))
+    is_csv_content = file.content_type in {"text/csv", "application/csv", "application/vnd.ms-excel"}
+    if not is_csv_filename and not is_csv_content:
         raise ValidationError("Uploaded file must be a CSV")
     try:
         return CatalogService(db).import_master_data_csv(

@@ -140,7 +140,7 @@ export function MasterDataPage({
         toast.success(`${title} imported. ${summary}.`);
       }
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : `Failed to import ${title.toLowerCase()}.`;
+      const msg = err instanceof Error ? err.message : `Failed to import ${title.toLowerCase()}.`;
       toast.error(msg);
     } finally {
       setIsImporting(false);
