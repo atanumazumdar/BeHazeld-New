@@ -3,13 +3,13 @@
 /**
  * /inventory — Inventory landing page.
  *
- * Shows all product variants that have stock activity (via the summary endpoint).
+ * Shows all active product variants from the catalog.
  * Clicking a SKU navigates to /inventory/[variantId] for the detail view.
  */
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useProducts, useVariants } from '@/hooks/use-catalog';
+import { useProducts } from '@/hooks/use-catalog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -22,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useDebounce } from 'use-debounce';
+import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 
 export default function InventoryPage() {
   const [search, setSearch] = useState('');
@@ -44,7 +45,7 @@ export default function InventoryPage() {
       <Input
         placeholder="Search products…"
         value={search}
-        onChange={(e) => setSearch(e.target.value)}
+        onValueChange={setSearch}
         className="w-64 bg-white"
       />
 
@@ -75,7 +76,7 @@ export default function InventoryPage() {
               </TableRow>
             ) : (
               products.map((product) => (
-                <ProductInventoryRow key={product.id} productId={product.id} productCode={product.product_code} productName={product.name} productStatus={product.status} />
+                <ProductInventoryRow key={product.id} product={product} />
               ))
             )}
           </TableBody>
@@ -88,66 +89,66 @@ export default function InventoryPage() {
 // ── Per-product row (lazy-loads variants) ─────────────────────────────────────
 
 function ProductInventoryRow({
-  productId,
-  productCode,
-  productName,
-  productStatus,
+  product,
 }: {
-  productId: string;
-  productCode: string;
-  productName: string;
-  productStatus: string;
+  product: ProductResponse;
 }) {
-  const { data: variants = [], isLoading } = useVariants(productId);
+  const variants = product.variants ?? [];
 
   return (
     <>
       {/* Product header row */}
       <TableRow className="bg-stone-50/40 hover:bg-stone-50">
-        <TableCell className="font-mono text-xs text-stone-500">{productCode}</TableCell>
-        <TableCell className="font-medium text-slate-800">{productName}</TableCell>
+        <TableCell className="font-mono text-xs text-stone-500">{product.product_code}</TableCell>
+        <TableCell className="font-medium text-slate-800">{product.name}</TableCell>
         <TableCell>
           <Badge
             variant="secondary"
             className={
-              productStatus === 'active'
+              product.status === 'active'
                 ? 'bg-emerald-100 text-emerald-800'
                 : 'bg-stone-100 text-stone-500'
             }
           >
-            {productStatus}
+            {product.status}
           </Badge>
         </TableCell>
         <TableCell className="text-right text-stone-400 text-sm">
-          {isLoading ? '…' : `${variants.length} SKU${variants.length !== 1 ? 's' : ''}`}
+          {`${variants.length} SKU${variants.length !== 1 ? 's' : ''}`}
         </TableCell>
       </TableRow>
 
       {/* Variant rows */}
       {variants.map((variant) => (
-        <TableRow key={variant.id} className="hover:bg-blue-50/30">
-          <TableCell />
-          <TableCell>
-            <Link
-              href={`/inventory/${variant.id}`}
-              className="font-mono text-sm text-slate-700 hover:text-blue-600 hover:underline"
-            >
-              {variant.sku_code}
-            </Link>
-          </TableCell>
-          <TableCell className="text-stone-500 text-sm">
-            MRP ₹{variant.mrp} · Sell ₹{variant.selling_price}
-          </TableCell>
-          <TableCell className="text-right">
-            <Link
-              href={`/inventory/${variant.id}`}
-              className="text-xs text-blue-600 hover:underline"
-            >
-              View stock →
-            </Link>
-          </TableCell>
-        </TableRow>
+        <InventoryVariantRow key={variant.id} variant={variant} />
       ))}
     </>
+  );
+}
+
+function InventoryVariantRow({ variant }: { variant: ProductVariantResponse }) {
+  return (
+    <TableRow className="hover:bg-blue-50/30">
+      <TableCell />
+      <TableCell>
+        <Link
+          href={`/inventory/${variant.id}`}
+          className="font-mono text-sm text-slate-700 hover:text-blue-600 hover:underline"
+        >
+          {variant.sku_code}
+        </Link>
+      </TableCell>
+      <TableCell className="text-stone-500 text-sm">
+        MRP ₹{variant.mrp} · Sell ₹{variant.selling_price}
+      </TableCell>
+      <TableCell className="text-right">
+        <Link
+          href={`/inventory/${variant.id}`}
+          className="text-xs text-blue-600 hover:underline"
+        >
+          View stock →
+        </Link>
+      </TableCell>
+    </TableRow>
   );
 }
