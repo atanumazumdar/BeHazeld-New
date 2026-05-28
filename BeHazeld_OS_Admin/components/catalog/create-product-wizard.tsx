@@ -97,6 +97,10 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
   const { data: productGroups = [] } = useProductGroups();
   const { data: productTypes = [] } = useProductTypes();
   const { data: brands = [] } = useBrands();
+  const categoryItems = categories.map((c) => ({ value: c.id, label: c.name }));
+  const productGroupItems = productGroups.map((g) => ({ value: g.id, label: g.name }));
+  const productTypeItems = productTypes.map((t) => ({ value: t.id, label: t.name }));
+  const brandItems = brands.map((b) => ({ value: b.id, label: b.name }));
 
   const createProduct = useCreateProduct();
 
@@ -224,11 +228,22 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
                 <Label htmlFor="name">
                   Product Name <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="name"
-                  {...register('name', { required: 'Name is required' })}
-                  placeholder="e.g. Classic Linen Shirt"
-                  className={errors.name ? 'border-red-400' : ''}
+                <Controller
+                  name="name"
+                  control={control}
+                  rules={{
+                    validate: (value) => value.trim().length > 0 || 'Name is required',
+                  }}
+                  render={({ field }) => (
+                    <Input
+                      id="name"
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      onBlur={field.onBlur}
+                      placeholder="e.g. Classic Linen Shirt"
+                      className={errors.name ? 'border-red-400' : ''}
+                    />
+                  )}
                 />
                 {errors.name && (
                   <p className="text-xs text-red-500">{errors.name.message}</p>
@@ -242,13 +257,17 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
                   name="product_group_id"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      items={productGroupItems}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select group…" />
                       </SelectTrigger>
                       <SelectContent>
                         {productGroups.map((g) => (
-                          <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
+                          <SelectItem key={g.id} value={g.id} label={g.name}>{g.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -263,13 +282,17 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
                   name="product_type_id"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      items={productTypeItems}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select type…" />
                       </SelectTrigger>
                       <SelectContent>
                         {productTypes.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                          <SelectItem key={t.id} value={t.id} label={t.name}>{t.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -284,13 +307,17 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
                   name="brand_id"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      items={brandItems}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select brand…" />
                       </SelectTrigger>
                       <SelectContent>
                         {brands.map((b) => (
-                          <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                          <SelectItem key={b.id} value={b.id} label={b.name}>{b.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -305,13 +332,17 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
                   name="category_id"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      items={categoryItems}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
                       <SelectTrigger className="bg-white">
                         <SelectValue placeholder="Select category…" />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -322,10 +353,18 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
               {/* Description */}
               <div className="col-span-2 space-y-1.5">
                 <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  {...register('description')}
-                  placeholder="Optional product description…"
+                <Controller
+                  name="description"
+                  control={control}
+                  render={({ field }) => (
+                    <Input
+                      id="description"
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      onBlur={field.onBlur}
+                      placeholder="Optional product description…"
+                    />
+                  )}
                 />
               </div>
             </div>

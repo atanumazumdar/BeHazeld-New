@@ -34,8 +34,11 @@ interface VariantRowProps {
 export function VariantRow({ index, onRemove, control, register, errors }: VariantRowProps) {
   const { data: sizes = [] } = useSizes();
   const { data: colors = [] } = useColors();
+  const sizeItems = sizes.map((s) => ({ value: s.id, label: s.name }));
+  const colorItems = colors.map((c) => ({ value: c.id, label: c.name }));
 
   const variantErrors = errors.variants?.[index];
+  void register;
 
   return (
     <div className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg bg-stone-50 border border-stone-200">
@@ -46,13 +49,13 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
           control={control}
           rules={{ required: true }}
           render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
+            <Select items={sizeItems} onValueChange={field.onChange} value={field.value}>
               <SelectTrigger className={`h-9 bg-white text-sm ${variantErrors?.size_id ? 'border-red-400' : ''}`}>
                 <SelectValue placeholder="Size" />
               </SelectTrigger>
               <SelectContent>
                 {sizes.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                  <SelectItem key={s.id} value={s.id} label={s.name}>{s.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -67,13 +70,13 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
           control={control}
           rules={{ required: true }}
           render={({ field }) => (
-            <Select onValueChange={field.onChange} value={field.value}>
+            <Select items={colorItems} onValueChange={field.onChange} value={field.value}>
               <SelectTrigger className={`h-9 bg-white text-sm ${variantErrors?.color_id ? 'border-red-400' : ''}`}>
                 <SelectValue placeholder="Color" />
               </SelectTrigger>
               <SelectContent>
                 {colors.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -83,43 +86,84 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
 
       {/* MRP */}
       <div className="col-span-2">
-        <Input
-          {...register(`variants.${index}.mrp`, { required: true, min: 0 })}
-          type="number"
-          step="0.01"
-          placeholder="MRP"
-          className={`h-9 bg-white text-sm ${variantErrors?.mrp ? 'border-red-400' : ''}`}
+        <Controller
+          name={`variants.${index}.mrp`}
+          control={control}
+          rules={{
+            validate: (value) => (value !== '' && Number(value) >= 0) || 'MRP is required',
+          }}
+          render={({ field }) => (
+            <Input
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              type="number"
+              step="0.01"
+              placeholder="MRP"
+              className={`h-9 bg-white text-sm ${variantErrors?.mrp ? 'border-red-400' : ''}`}
+            />
+          )}
         />
       </div>
 
       {/* Selling Price */}
       <div className="col-span-2">
-        <Input
-          {...register(`variants.${index}.selling_price`, { required: true, min: 0 })}
-          type="number"
-          step="0.01"
-          placeholder="Sell Price"
-          className={`h-9 bg-white text-sm ${variantErrors?.selling_price ? 'border-red-400' : ''}`}
+        <Controller
+          name={`variants.${index}.selling_price`}
+          control={control}
+          rules={{
+            validate: (value) => (value !== '' && Number(value) >= 0) || 'Selling price is required',
+          }}
+          render={({ field }) => (
+            <Input
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              type="number"
+              step="0.01"
+              placeholder="Sell Price"
+              className={`h-9 bg-white text-sm ${variantErrors?.selling_price ? 'border-red-400' : ''}`}
+            />
+          )}
         />
       </div>
 
       {/* Cost Price */}
       <div className="col-span-2">
-        <Input
-          {...register(`variants.${index}.cost_price`, { required: true, min: 0 })}
-          type="number"
-          step="0.01"
-          placeholder="Cost"
-          className={`h-9 bg-white text-sm ${variantErrors?.cost_price ? 'border-red-400' : ''}`}
+        <Controller
+          name={`variants.${index}.cost_price`}
+          control={control}
+          rules={{
+            validate: (value) => (value !== '' && Number(value) >= 0) || 'Cost is required',
+          }}
+          render={({ field }) => (
+            <Input
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              type="number"
+              step="0.01"
+              placeholder="Cost"
+              className={`h-9 bg-white text-sm ${variantErrors?.cost_price ? 'border-red-400' : ''}`}
+            />
+          )}
         />
       </div>
 
       {/* Fabric (optional) */}
       <div className="col-span-1">
-        <Input
-          {...register(`variants.${index}.fabric`)}
-          placeholder="Fabric"
-          className="h-9 bg-white text-sm"
+        <Controller
+          name={`variants.${index}.fabric`}
+          control={control}
+          render={({ field }) => (
+            <Input
+              value={field.value}
+              onValueChange={field.onChange}
+              onBlur={field.onBlur}
+              placeholder="Fabric"
+              className="h-9 bg-white text-sm"
+            />
+          )}
         />
       </div>
 
