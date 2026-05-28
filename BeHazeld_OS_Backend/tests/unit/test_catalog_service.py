@@ -55,8 +55,8 @@ def _mock_product(code: str) -> MagicMock:
 
 # ── product code generation ───────────────────────────────────────────────────
 
-def test_create_product_uses_group_name_for_code() -> None:
-    """When a product_group_id is given, group.name drives the code prefix."""
+def test_create_product_generates_initials_code() -> None:
+    """Product code is the first letter of each product-name word."""
     svc, db = _make_service()
     tenant_id = uuid.uuid4()
     group_id = uuid.uuid4()
@@ -66,15 +66,15 @@ def test_create_product_uses_group_name_for_code() -> None:
     created_product = MagicMock()
     svc.repo.create_product = MagicMock(return_value=created_product)
 
-    req = CreateProductRequest(name="Kurti", product_group_id=group_id)
+    req = CreateProductRequest(name="Power Edit Georgette Kurti", product_group_id=group_id)
     svc.create_product(tenant_id, req)
 
     call_kwargs = svc.repo.create_product.call_args
-    assert call_kwargs.kwargs["product_code"] == "SUM-KURT-0001"
+    assert call_kwargs.kwargs["product_code"] == "PEGK"
 
 
-def test_create_product_falls_back_to_product_name_when_no_group() -> None:
-    """When product_group_id is None, product name is used for both group and name slots."""
+def test_create_product_code_does_not_require_group() -> None:
+    """Product code generation only needs the product name."""
     svc, db = _make_service()
     tenant_id = uuid.uuid4()
 
@@ -86,7 +86,7 @@ def test_create_product_falls_back_to_product_name_when_no_group() -> None:
     svc.create_product(tenant_id, req)
 
     call_kwargs = svc.repo.create_product.call_args
-    assert call_kwargs.kwargs["product_code"] == "JAC-JACK-0006"
+    assert call_kwargs.kwargs["product_code"] == "J"
 
 
 def test_create_product_raises_if_group_not_found() -> None:
@@ -185,8 +185,8 @@ def test_import_master_data_csv_accepts_tab_delimited_exports() -> None:
     assert svc.repo.create_category.call_args_list[0].kwargs["sort_order"] == 1
 
 
-def test_create_product_sequence_increments_correctly() -> None:
-    """Sequence = count + 1, so the 10th product has seq=10."""
+def test_create_product_sequence_does_not_change_initials_code() -> None:
+    """The legacy sequence argument is ignored by the initials-based code."""
     svc, _ = _make_service()
     tenant_id = uuid.uuid4()
 
@@ -198,20 +198,20 @@ def test_create_product_sequence_increments_correctly() -> None:
     svc.create_product(tenant_id, req)
 
     code = svc.repo.create_product.call_args.kwargs["product_code"]
-    assert code.endswith("-0010")
+    assert code == "S"
 
 
 # ── variant / SKU generation ──────────────────────────────────────────────────
 
 def test_create_variant_generates_correct_sku() -> None:
-    """SKU = product_code + size[:2] + color[:3], all upper, no spaces."""
+    """SKU = product code + first 3 color letters + size."""
     svc, _ = _make_service()
     tenant_id = uuid.uuid4()
     product_id = uuid.uuid4()
 
-    svc.repo.get_product_by_id = MagicMock(return_value=_mock_product("SUM-KURT-0001"))
-    svc.repo.get_size_by_id = MagicMock(return_value=_mock_size("XL"))
-    svc.repo.get_color_by_id = MagicMock(return_value=_mock_color("Midnight Blue"))
+    svc.repo.get_product_by_id = MagicMock(return_value=_mock_product("PEGK"))
+    svc.repo.get_size_by_id = MagicMock(return_value=_mock_size("42"))
+    svc.repo.get_color_by_id = MagicMock(return_value=_mock_color("Peach"))
     created_variant = MagicMock()
     svc.repo.create_variant = MagicMock(return_value=created_variant)
 
@@ -225,7 +225,7 @@ def test_create_variant_generates_correct_sku() -> None:
     svc.create_variant(tenant_id, product_id, req)
 
     sku = svc.repo.create_variant.call_args.kwargs["sku_code"]
-    assert sku == "SUM-KURT-0001-XLMID"
+    assert sku == "PEGK-PCH-42"
 
 
 def test_create_variant_raises_if_size_not_found() -> None:

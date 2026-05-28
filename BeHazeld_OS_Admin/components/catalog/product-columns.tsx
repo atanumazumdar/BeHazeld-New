@@ -8,11 +8,14 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { ProductResponse } from '@/types/catalog';
-import Link from 'next/link';
+import { type ChangeEvent, useRef } from 'react';
+import { toast } from 'sonner';
+import { useUploadVariantImage } from '@/hooks/use-catalog';
 
 interface ProductActionsProps {
-  product: ProductResponse;
+  productId: string;
+  variantId: string | null;
+  hasImage: boolean;
   onDelete: (id: string) => void;
 }
 
@@ -32,23 +35,50 @@ export function ProductStatusBadge({ status }: { status: string }) {
   );
 }
 
-export function ProductRowActions({ product, onDelete }: ProductActionsProps) {
+export function ProductRowActions({ productId, variantId, hasImage, onDelete }: ProductActionsProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const uploadVariantImage = useUploadVariantImage(productId);
+
+  const handlePhotoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !variantId) return;
+
+    try {
+      await uploadVariantImage.mutateAsync({ variantId, file });
+      toast.success(hasImage ? 'Picture updated.' : 'Picture uploaded.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to upload picture.';
+      toast.error(msg);
+    }
+  };
+
   return (
-    <div className="flex items-center gap-2">
-      <Link
-        href={`/catalog/products/${product.id}`}
-        className="inline-flex items-center justify-center rounded-md text-sm font-medium h-8 px-3 text-slate-700 hover:bg-stone-100 transition-colors"
+    <div className="flex items-center justify-end gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={handlePhotoChange}
+      />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-slate-700 hover:bg-stone-100"
+        disabled={!variantId || uploadVariantImage.isPending}
+        onClick={() => inputRef.current?.click()}
       >
-        View
-      </Link>
+        {hasImage ? 'Edit Photo' : 'Add Photo'}
+      </Button>
       <Button
         variant="ghost"
         size="sm"
         className="text-red-600 hover:text-red-700 hover:bg-red-50"
-        onClick={() => onDelete(product.id)}
-        disabled={product.status !== 'active'}
+        onClick={() => onDelete(productId)}
       >
-        Delete
+        Archive
       </Button>
     </div>
   );

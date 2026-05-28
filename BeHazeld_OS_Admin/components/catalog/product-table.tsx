@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Select,
@@ -32,8 +33,16 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ProductStatusBadge, ProductRowActions } from './product-columns';
-import { useProducts, useBrands, useCategories, useDeleteProduct } from '@/hooks/use-catalog';
+import {
+  useBrands,
+  useCategories,
+  useColors,
+  useDeleteProduct,
+  useProducts,
+  useSizes,
+} from '@/hooks/use-catalog';
 import { ApiError } from '@/types/api';
+import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 
 const PAGE_SIZE = 20;
 
@@ -51,6 +60,8 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
 
   const { data: categories = [] } = useCategories();
   const { data: brands = [] } = useBrands();
+  const { data: sizes = [] } = useSizes();
+  const { data: colors = [] } = useColors();
   const { data: products = [], isLoading, isFetching } = useProducts({
     search: debouncedSearch || undefined,
     category_id: categoryId,
@@ -80,6 +91,23 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
     };
 
   const loading = isLoading || isFetching;
+  const categoryItems = [
+    { value: 'all', label: 'All categories' },
+    ...categories.map((c) => ({ value: c.id, label: c.name })),
+  ];
+  const brandItems = [
+    { value: 'all', label: 'All brands' },
+    ...brands.map((b) => ({ value: b.id, label: b.name })),
+  ];
+  const sizeNameById = new Map(sizes.map((s) => [s.id, s.name]));
+  const colorNameById = new Map(colors.map((c) => [c.id, c.name]));
+  const rows = products.flatMap((product: ProductResponse) => {
+    const variants = product.variants ?? [];
+    if (variants.length === 0) {
+      return [{ product, variant: null as ProductVariantResponse | null }];
+    }
+    return variants.map((variant) => ({ product, variant }));
+  });
 
   return (
     <div className="space-y-4">
@@ -88,30 +116,38 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
         <Input
           placeholder="Search code or name…"
           value={search}
-          onChange={(e) => { setSearch(e.target.value); setSkip(0); }}
+          onValueChange={(value) => { setSearch(value); setSkip(0); }}
           className="w-56 bg-white"
         />
 
-        <Select onValueChange={handleFilterChange(setCategoryId)} defaultValue="all">
+        <Select
+          items={categoryItems}
+          onValueChange={handleFilterChange(setCategoryId)}
+          defaultValue="all"
+        >
           <SelectTrigger className="w-44 bg-white">
             <SelectValue placeholder="All categories" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="all" label="All categories">All categories</SelectItem>
             {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+              <SelectItem key={c.id} value={c.id} label={c.name}>{c.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        <Select onValueChange={handleFilterChange(setBrandId)} defaultValue="all">
+        <Select
+          items={brandItems}
+          onValueChange={handleFilterChange(setBrandId)}
+          defaultValue="all"
+        >
           <SelectTrigger className="w-40 bg-white">
             <SelectValue placeholder="All brands" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All brands</SelectItem>
+            <SelectItem value="all" label="All brands">All brands</SelectItem>
             {brands.map((b) => (
-              <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+              <SelectItem key={b.id} value={b.id} label={b.name}>{b.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -140,8 +176,12 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
             <TableRow className="bg-stone-50 hover:bg-stone-50">
               <TableHead className="text-stone-600 font-medium">Code</TableHead>
               <TableHead className="text-stone-600 font-medium">Name</TableHead>
-              <TableHead className="text-stone-600 font-medium">Category</TableHead>
-              <TableHead className="text-stone-600 font-medium">Brand</TableHead>
+              <TableHead className="text-stone-600 font-medium">Color</TableHead>
+              <TableHead className="text-stone-600 font-medium">Size</TableHead>
+              <TableHead className="text-stone-600 font-medium">MRP</TableHead>
+              <TableHead className="text-stone-600 font-medium">Cost</TableHead>
+              <TableHead className="text-stone-600 font-medium">Selling</TableHead>
+              <TableHead className="text-stone-600 font-medium">Picture</TableHead>
               <TableHead className="text-stone-600 font-medium">Status</TableHead>
               <TableHead className="text-stone-600 font-medium text-right">Actions</TableHead>
             </TableRow>
@@ -150,37 +190,59 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 10 }).map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
                   ))}
                 </TableRow>
               ))
-            ) : products.length === 0 ? (
+            ) : rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-stone-400">
+                <TableCell colSpan={10} className="py-12 text-center text-stone-400">
                   No products found.
                 </TableCell>
               </TableRow>
             ) : (
-              products.map((product) => (
-                <TableRow key={product.id} className="hover:bg-stone-50/60">
+              rows.map(({ product, variant }) => (
+                <TableRow key={variant?.id ?? product.id} className="hover:bg-stone-50/60">
                   <TableCell className="font-mono text-sm text-stone-700">
-                    {product.product_code}
+                    {variant?.sku_code ?? product.product_code}
                   </TableCell>
                   <TableCell className="font-medium text-slate-800">{product.name}</TableCell>
                   <TableCell className="text-stone-600 text-sm">
-                    {categories.find((c) => c.id === product.category_id)?.name ?? '—'}
+                    {variant ? colorNameById.get(variant.color_id) ?? '—' : '—'}
                   </TableCell>
                   <TableCell className="text-stone-600 text-sm">
-                    {brands.find((b) => b.id === product.brand_id)?.name ?? '—'}
+                    {variant ? sizeNameById.get(variant.size_id) ?? '—' : '—'}
+                  </TableCell>
+                  <TableCell className="text-stone-600 text-sm">
+                    {variant?.mrp ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-stone-600 text-sm">
+                    {variant?.cost_price ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-stone-600 text-sm">
+                    {variant?.selling_price ?? '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant="secondary"
+                      className={variant?.image_url ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}
+                    >
+                      {variant?.image_url ? 'Yes' : 'No'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <ProductStatusBadge status={product.status} />
                   </TableCell>
                   <TableCell className="text-right">
-                    <ProductRowActions product={product} onDelete={handleDelete} />
+                    <ProductRowActions
+                      productId={product.id}
+                      variantId={variant?.id ?? null}
+                      hasImage={Boolean(variant?.image_url)}
+                      onDelete={handleDelete}
+                    />
                   </TableCell>
                 </TableRow>
               ))
@@ -192,7 +254,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
       {/* Pagination */}
       <div className="flex items-center justify-between text-sm text-stone-500">
         <span>
-          {loading ? '…' : `${products.length} result${products.length !== 1 ? 's' : ''}`}
+          {loading ? '…' : `${rows.length} result${rows.length !== 1 ? 's' : ''}`}
         </span>
         <div className="flex gap-2">
           <Button

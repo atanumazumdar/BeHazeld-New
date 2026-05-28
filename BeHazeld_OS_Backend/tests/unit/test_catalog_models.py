@@ -89,29 +89,29 @@ def test_barcode_has_type() -> None:
 
 def test_generate_product_code_format() -> None:
     from app.repositories.catalog_repository import generate_product_code
-    code = generate_product_code("Summer Collection", "Kurti", 1)
-    assert code == "SUM-KURT-0001"
+    code = generate_product_code("Summer Collection", "Power Edit Georgette Kurti", 1)
+    assert code == "PEGK"
 
 
-def test_generate_product_code_pads_sequence() -> None:
+def test_generate_product_code_ignores_sequence() -> None:
     from app.repositories.catalog_repository import generate_product_code
     code = generate_product_code("Winter", "Jacket", 42)
-    assert code == "WIN-JACK-0042"
+    assert code == "J"
 
 
 def test_generate_product_code_handles_short_names() -> None:
     from app.repositories.catalog_repository import generate_product_code
     code = generate_product_code("Go", "T", 1)
-    assert code == "GO-T-0001"
+    assert code == "T"
 
 
 def test_generate_sku_code_format() -> None:
     from app.repositories.catalog_repository import generate_sku_code
-    sku = generate_sku_code("SUM-KURT-0001", "XL", "Midnight Blue")
-    assert sku == "SUM-KURT-0001-XLMID"
+    sku = generate_sku_code("PEGK", "42", "Peach")
+    assert sku == "PEGK-PCH-42"
 
 
 def test_generate_sku_code_short_size_color() -> None:
     from app.repositories.catalog_repository import generate_sku_code
-    sku = generate_sku_code("WIN-JACK-0042", "S", "Red")
-    assert sku == "WIN-JACK-0042-SRED"
+    sku = generate_sku_code("J", "S", "Red")
+    assert sku == "J-RED-S"

@@ -18,29 +18,28 @@ def mock_db() -> MagicMock:
 
 def test_generate_product_code_basic() -> None:
     from app.repositories.catalog_repository import generate_product_code
-    assert generate_product_code("Summer Collection", "Kurti", 1) == "SUM-KURT-0001"
+    assert generate_product_code("Summer Collection", "Power Edit Georgette Kurti", 1) == "PEGK"
 
 
-def test_generate_product_code_pads_to_4_digits() -> None:
+def test_generate_product_code_uses_single_initial_for_one_word() -> None:
     from app.repositories.catalog_repository import generate_product_code
-    assert generate_product_code("Winter", "Jacket", 42) == "WIN-JACK-0042"
+    assert generate_product_code("Winter", "Jacket", 42) == "J"
 
 
-def test_generate_product_code_truncates_at_3_and_4() -> None:
+def test_generate_product_code_handles_short_and_hyphenated_names() -> None:
     from app.repositories.catalog_repository import generate_product_code
-    # Group prefix: 3 chars max; name suffix: 4 chars max
-    assert generate_product_code("Go", "T", 1) == "GO-T-0001"
-    assert generate_product_code("ABCDEF", "ABCDEFGH", 1) == "ABC-ABCD-0001"
+    assert generate_product_code("Go", "T", 1) == "T"
+    assert generate_product_code("ABCDEF", "A-Line Dress", 1) == "ALD"
 
 
 def test_generate_sku_code_format() -> None:
     from app.repositories.catalog_repository import generate_sku_code
-    assert generate_sku_code("SUM-KURT-0001", "XL", "Midnight Blue") == "SUM-KURT-0001-XLMID"
+    assert generate_sku_code("PEGK", "42", "Peach") == "PEGK-PCH-42"
 
 
 def test_generate_sku_code_short_color() -> None:
     from app.repositories.catalog_repository import generate_sku_code
-    assert generate_sku_code("WIN-JACK-0042", "S", "Red") == "WIN-JACK-0042-SRED"
+    assert generate_sku_code("J", "S", "Red") == "J-RED-S"
 
 
 # ── master table reads ────────────────────────────────────────────────────────

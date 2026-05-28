@@ -159,24 +159,6 @@ class ColorResponse(BaseModel):
     updated_at: datetime
 
 
-class ProductResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    tenant_id: uuid.UUID
-    product_code: str
-    name: str
-    description: str | None
-    image_url: str | None
-    status: str
-    category_id: uuid.UUID | None
-    product_group_id: uuid.UUID | None
-    product_type_id: uuid.UUID | None
-    brand_id: uuid.UUID | None
-    created_at: datetime
-    updated_at: datetime
-
-
 class ProductVariantResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -202,3 +184,29 @@ class ProductVariantResponse(BaseModel):
         if v is None or isinstance(v, str):
             return v
         return None
+
+
+class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    product_code: str
+    name: str
+    description: str | None
+    image_url: str | None
+    status: str
+    category_id: uuid.UUID | None
+    product_group_id: uuid.UUID | None
+    product_type_id: uuid.UUID | None
+    brand_id: uuid.UUID | None
+    created_at: datetime
+    updated_at: datetime
+    variants: list[ProductVariantResponse] = Field(default_factory=list)
+
+    @field_validator("variants", mode="before")
+    @classmethod
+    def variants_must_be_list(cls, v: object) -> list[ProductVariantResponse]:
+        if isinstance(v, list):
+            return v
+        return []

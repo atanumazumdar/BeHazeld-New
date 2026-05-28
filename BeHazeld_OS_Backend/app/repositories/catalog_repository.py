@@ -9,7 +9,7 @@ Module-level helpers
 --------------------
 generate_product_code(group_name, product_name, seq) → str
     Pure function — deterministic, no DB calls. Called by the service layer,
-    which calls count_products_by_tenant() to get the sequence number.
+    keeping the legacy signature while generating initials from product name.
 
 generate_sku_code(product_code, size_name, color_name) → str
     Pure function — deterministic, no DB calls.
@@ -40,29 +40,33 @@ def generate_product_code(group_name: str, product_name: str, seq: int) -> str:
     """
     Produce a human-readable, unique product code.
 
-    Format: {GROUP[:3]}-{NAME[:4]}-{SEQ:04d}
+    Format: first letters of each product name word.
     Examples:
-      ("Summer Collection", "Kurti", 1)  → "SUM-KURT-0001"
-      ("Winter",            "Jacket", 42) → "WIN-JACK-0042"
-      ("Go",                "T",      1)  → "GO-T-0001"
+      ("Power Edit Georgette Kurti") → "PEGK"
+      ("Peach Kurta")                → "PK"
     """
-    g = group_name.strip().upper().replace(" ", "")[:3]
-    n = product_name.strip().upper().replace(" ", "")[:4]
-    return f"{g}-{n}-{seq:04d}"
+    del group_name, seq
+    words = [word for word in product_name.strip().replace("-", " ").split() if word]
+    initials = "".join(word[0].upper() for word in words)
+    return initials or product_name.strip().upper().replace(" ", "")[:4]
 
 
 def generate_sku_code(product_code: str, size_name: str, color_name: str) -> str:
     """
-    Append size+color suffixes to the product code to form the SKU.
+    Append color + size suffixes to the product code to form the SKU.
 
-    Format: {product_code}-{SIZE[:2]}{COLOR[:3]}  (all upper-case, no spaces)
+    Format: {product_code}-{COLOR_CODE}-{SIZE}
     Examples:
-      ("SUM-KURT-0001", "XL",  "Midnight Blue") → "SUM-KURT-0001-XLMID"
-      ("WIN-JACK-0042", "S",   "Red")            → "WIN-JACK-0042-SRED"
+      ("PEGK", "42", "Peach")         → "PEGK-PCH-42"
+      ("PK",   "M",  "Red")           → "PK-RED-M"
     """
-    s = size_name.strip().upper().replace(" ", "")[:2]
-    c = color_name.strip().upper().replace(" ", "")[:3]
-    return f"{product_code}-{s}{c}"
+    s = size_name.strip().upper().replace(" ", "")
+    raw_color = "".join(ch for ch in color_name.strip().upper() if ch.isalnum())
+    color_without_vowels = raw_color[:1] + "".join(
+        ch for ch in raw_color[1:] if ch not in {"A", "E", "I", "O", "U"}
+    )
+    c = (color_without_vowels if len(color_without_vowels) >= 3 else raw_color)[:3]
+    return f"{product_code}-{c}-{s}"
 
 
 # ── Repository ────────────────────────────────────────────────────────────────
