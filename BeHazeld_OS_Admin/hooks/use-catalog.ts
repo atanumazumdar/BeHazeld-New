@@ -33,6 +33,25 @@ import type {
   SizeResponse,
 } from '@/types/catalog';
 
+interface ActionResult<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+function requireActionData<T>(
+  result: ActionResult<T> | undefined,
+  fallbackMessage: string,
+): T {
+  if (!result) {
+    throw new Error('No response from the server. Please refresh and try again.');
+  }
+  if (!result.success || !result.data) {
+    throw new Error(result.message ?? fallbackMessage);
+  }
+  return result.data;
+}
+
 // ── Query keys ────────────────────────────────────────────────────────────────
 
 export const catalogKeys = {
@@ -56,8 +75,7 @@ export function useCategories() {
     queryKey: catalogKeys.categories(),
     queryFn: async () => {
       const result = await listMasterDataAction('categories');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load categories.');
-      return result.data as CategoryResponse[];
+      return requireActionData(result, 'Failed to load categories.') as CategoryResponse[];
     },
   });
 }
@@ -67,8 +85,7 @@ export function useProductGroups() {
     queryKey: catalogKeys.productGroups(),
     queryFn: async () => {
       const result = await listMasterDataAction('product-groups');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load product groups.');
-      return result.data as ProductGroupResponse[];
+      return requireActionData(result, 'Failed to load product groups.') as ProductGroupResponse[];
     },
   });
 }
@@ -78,8 +95,7 @@ export function useProductTypes() {
     queryKey: catalogKeys.productTypes(),
     queryFn: async () => {
       const result = await listMasterDataAction('product-types');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load product types.');
-      return result.data as ProductTypeResponse[];
+      return requireActionData(result, 'Failed to load product types.') as ProductTypeResponse[];
     },
   });
 }
@@ -89,8 +105,7 @@ export function useBrands() {
     queryKey: catalogKeys.brands(),
     queryFn: async () => {
       const result = await listMasterDataAction('brands');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load brands.');
-      return result.data as BrandResponse[];
+      return requireActionData(result, 'Failed to load brands.') as BrandResponse[];
     },
   });
 }
@@ -100,8 +115,7 @@ export function useSizes() {
     queryKey: catalogKeys.sizes(),
     queryFn: async () => {
       const result = await listMasterDataAction('sizes');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load sizes.');
-      return result.data as SizeResponse[];
+      return requireActionData(result, 'Failed to load sizes.') as SizeResponse[];
     },
   });
 }
@@ -111,8 +125,7 @@ export function useColors() {
     queryKey: catalogKeys.colors(),
     queryFn: async () => {
       const result = await listMasterDataAction('colors');
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to load colors.');
-      return result.data as ColorResponse[];
+      return requireActionData(result, 'Failed to load colors.') as ColorResponse[];
     },
   });
 }
@@ -199,8 +212,7 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: async (data: CreateCategoryPayload) => {
       const result = await createMasterDataAction('categories', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create category.');
-      return result.data as CategoryResponse;
+      return requireActionData(result, 'Failed to create category.') as CategoryResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.categories() }),
   });
@@ -211,8 +223,7 @@ export function useCreateProductGroup() {
   return useMutation({
     mutationFn: async (data: CreateMasterPayload) => {
       const result = await createMasterDataAction('product-groups', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create product group.');
-      return result.data as ProductGroupResponse;
+      return requireActionData(result, 'Failed to create product group.') as ProductGroupResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.productGroups() }),
   });
@@ -223,8 +234,7 @@ export function useCreateProductType() {
   return useMutation({
     mutationFn: async (data: CreateMasterPayload) => {
       const result = await createMasterDataAction('product-types', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create product type.');
-      return result.data as ProductTypeResponse;
+      return requireActionData(result, 'Failed to create product type.') as ProductTypeResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.productTypes() }),
   });
@@ -235,8 +245,7 @@ export function useCreateBrand() {
   return useMutation({
     mutationFn: async (data: CreateMasterPayload) => {
       const result = await createMasterDataAction('brands', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create brand.');
-      return result.data as BrandResponse;
+      return requireActionData(result, 'Failed to create brand.') as BrandResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.brands() }),
   });
@@ -247,8 +256,7 @@ export function useCreateSize() {
   return useMutation({
     mutationFn: async (data: CreateSizePayload) => {
       const result = await createMasterDataAction('sizes', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create size.');
-      return result.data as SizeResponse;
+      return requireActionData(result, 'Failed to create size.') as SizeResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.sizes() }),
   });
@@ -259,8 +267,7 @@ export function useCreateColor() {
   return useMutation({
     mutationFn: async (data: CreateColorPayload) => {
       const result = await createMasterDataAction('colors', data);
-      if (!result.success || !result.data) throw new Error(result.message ?? 'Failed to create color.');
-      return result.data as ColorResponse;
+      return requireActionData(result, 'Failed to create color.') as ColorResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.colors() }),
   });
@@ -273,10 +280,7 @@ export function useImportMasterData(entityType: MasterDataImportType) {
       const form = new FormData();
       form.append('file', file);
       const result = await importMasterDataAction(entityType, form);
-      if (!result.success || !result.data) {
-        throw new Error(result.message ?? 'Failed to import CSV.');
-      }
-      return result.data;
+      return requireActionData(result, 'Failed to import CSV.');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
   });
