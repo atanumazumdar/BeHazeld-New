@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Public category response ──────────────────────────────────────────────────
@@ -31,9 +31,17 @@ class PublicVariantResponse(BaseModel):
 
     id: uuid.UUID
     sku_code: str
+    image_url: str | None
     mrp: Decimal
     selling_price: Decimal
     status: str
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def image_url_must_be_string_or_none(cls, v: object) -> str | None:
+        if v is None or isinstance(v, str):
+            return v
+        return None
 
 
 # ── Public product response ───────────────────────────────────────────────────

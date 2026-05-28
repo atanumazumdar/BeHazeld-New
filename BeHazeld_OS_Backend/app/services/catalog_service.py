@@ -197,6 +197,22 @@ class CatalogService:
             ],
         )
 
+    def _ensure_variant_image_column_available(self) -> None:
+        """Add variant image storage on existing production catalog tables."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS catalog"))
+            conn.execute(
+                text(
+                    "ALTER TABLE IF EXISTS catalog.product_variants "
+                    "ADD COLUMN IF NOT EXISTS image_url VARCHAR(500)"
+                )
+            )
+
     def _required_import_columns(self, entity_type: str) -> set[str]:
         required_columns = {
             "categories": {"name"},
@@ -349,6 +365,7 @@ class CatalogService:
         """
         Validate size + color existence, then generate the SKU and create the variant.
         """
+        self._ensure_variant_image_column_available()
         # Validate parent product exists
         product = self.repo.get_product_by_id(tenant_id, product_id)  # raises NotFoundError
 
@@ -372,8 +389,35 @@ class CatalogService:
             selling_price=req.selling_price,
             cost_price=req.cost_price,
             fabric=req.fabric,
+            image_url=req.image_url,
             reorder_level=req.reorder_level,
         )
+        self.db.commit()
+        self.db.refresh(variant)
+        return variant
+
+    def upload_variant_image(
+        self,
+        tenant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        file,
+        filename: str | None = None,
+    ) -> ProductVariant:
+        self._ensure_variant_image_column_available()
+        product = self.repo.get_product_by_id(tenant_id, product_id)
+        variant = self.repo.get_variant_by_id(tenant_id, variant_id)
+        if variant.product_id != product.id:
+            raise NotFoundError(f"ProductVariant {variant_id} not found for product {product_id}")
+
+        image_url = ImageService().upload_variant_image(
+            file,
+            tenant_id=tenant_id,
+            product_id=product_id,
+            variant_id=variant_id,
+            filename=filename,
+        )
+        variant = self.repo.update_variant_image_url(tenant_id, variant_id, image_url)
         self.db.commit()
         self.db.refresh(variant)
         return variant

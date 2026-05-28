@@ -50,6 +50,7 @@ export interface ProductVariantResponse {
   sku_code: string;
   size_id: string;
   color_id: string;
+  image_url: string | null;
   mrp: string;            // Decimal serialised as string
   selling_price: string;
   cost_price: string | null;
@@ -92,6 +93,7 @@ export interface CreateVariantPayload {
   selling_price: string;
   cost_price: string;
   fabric: string | null;
+  image_url?: string | null;
   reorder_level: string;
 }
 

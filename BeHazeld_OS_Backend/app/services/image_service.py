@@ -51,3 +51,28 @@ class ImageService:
         if not secure_url:
             raise ValidationError("Cloudinary upload did not return a secure URL")
         return str(secure_url)
+
+    def upload_variant_image(
+        self,
+        file: BinaryIO,
+        *,
+        tenant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        filename: str | None = None,
+    ) -> str:
+        public_id = f"{variant_id}"
+        if filename:
+            public_id = f"{variant_id}-{filename.rsplit('.', 1)[0]}"
+
+        result = cloudinary.uploader.upload(
+            file,
+            folder=f"behazeld/{tenant_id}/products/{product_id}/variants",
+            public_id=public_id,
+            overwrite=True,
+            resource_type="image",
+        )
+        secure_url = result.get("secure_url")
+        if not secure_url:
+            raise ValidationError("Cloudinary upload did not return a secure URL")
+        return str(secure_url)

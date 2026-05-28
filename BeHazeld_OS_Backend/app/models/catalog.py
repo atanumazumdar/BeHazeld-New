@@ -328,6 +328,7 @@ class ProductVariant(Base, TimestampMixin):
 
     sku_code: Mapped[str] = mapped_column(String(100), nullable=False)
     fabric: Mapped[str | None] = mapped_column(String(150))   # free-text, no master needed
+    image_url: Mapped[str | None] = mapped_column(String(500))
 
     mrp: Mapped[Decimal] = mapped_column(_PRICE, nullable=False)
     selling_price: Mapped[Decimal] = mapped_column(_PRICE, nullable=False)

@@ -314,6 +314,28 @@ def create_variant(
     return CatalogService(db).create_variant(ctx.tenant_id, product_id, body)  # type: ignore[return-value]
 
 
+@router.post(
+    "/products/{product_id}/variants/{variant_id}/image",
+    response_model=ProductVariantResponse,
+)
+def upload_variant_image(
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID,
+    image: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("catalog.variants.create")),
+    db: Session = Depends(get_db),
+) -> ProductVariantResponse:
+    if not image.content_type or not image.content_type.startswith("image/"):
+        raise ValidationError("Uploaded file must be an image")
+    return CatalogService(db).upload_variant_image(
+        ctx.tenant_id,
+        product_id,
+        variant_id,
+        image.file,
+        filename=image.filename,
+    )  # type: ignore[return-value]
+
+
 @router.delete(
     "/products/{product_id}/variants/{variant_id}",
     response_model=ProductVariantResponse,

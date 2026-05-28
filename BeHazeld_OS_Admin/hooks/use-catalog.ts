@@ -10,9 +10,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
+  createProductAction,
   createMasterDataAction,
+  createVariantAction,
   importMasterDataAction,
   listMasterDataAction,
+  uploadVariantImageAction,
 } from '@/lib/catalog-actions';
 import type {
   BrandResponse,
@@ -172,8 +175,10 @@ export function useVariants(productId: string) {
 export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateProductPayload) =>
-      apiClient.post<ProductResponse>('/api/v1/catalog/products', data),
+    mutationFn: async (data: CreateProductPayload) => {
+      const result = await createProductAction(data);
+      return requireActionData(result, 'Failed to create product.') as ProductResponse;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.all });
     },
@@ -183,13 +188,28 @@ export function useCreateProduct() {
 export function useCreateVariant(productId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateVariantPayload) =>
-      apiClient.post<ProductVariantResponse>(
-        `/api/v1/catalog/products/${productId}/variants`,
-        data,
-      ),
+    mutationFn: async (data: CreateVariantPayload) => {
+      const result = await createVariantAction(productId, data);
+      return requireActionData(result, 'Failed to create variant.') as ProductVariantResponse;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });
+    },
+  });
+}
+
+export function useUploadVariantImage(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ variantId, file }: { variantId: string; file: File }) => {
+      const form = new FormData();
+      form.append('image', file);
+      const result = await uploadVariantImageAction(productId, variantId, form);
+      return requireActionData(result, 'Failed to upload variant image.') as ProductVariantResponse;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });
+      qc.invalidateQueries({ queryKey: catalogKeys.products() });
     },
   });
 }

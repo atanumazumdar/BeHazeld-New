@@ -9,11 +9,15 @@ import type {
   CreateCategoryPayload,
   CreateColorPayload,
   CreateMasterPayload,
+  CreateProductPayload,
   CreateSizePayload,
+  CreateVariantPayload,
   MasterDataImportResponse,
   MasterDataImportType,
   ProductGroupResponse,
+  ProductResponse,
   ProductTypeResponse,
+  ProductVariantResponse,
   SizeResponse,
 } from '@/types/catalog';
 
@@ -185,5 +189,104 @@ export async function importMasterDataAction(
   return {
     success: true,
     data: (await response.json()) as MasterDataImportResponse,
+  };
+}
+
+async function authenticatedJsonRequest<T>(
+  path: string,
+  payload: unknown,
+  fallback: string,
+): Promise<CatalogActionResult<T>> {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    return { success: false, message: 'Session expired. Please sign in again.' };
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, fallback),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as T,
+  };
+}
+
+export async function createProductAction(
+  payload: CreateProductPayload,
+): Promise<CatalogActionResult<ProductResponse>> {
+  return authenticatedJsonRequest<ProductResponse>(
+    '/api/v1/catalog/products',
+    payload,
+    'Failed to create product.',
+  );
+}
+
+export async function createVariantAction(
+  productId: string,
+  payload: CreateVariantPayload,
+): Promise<CatalogActionResult<ProductVariantResponse>> {
+  return authenticatedJsonRequest<ProductVariantResponse>(
+    `/api/v1/catalog/products/${productId}/variants`,
+    payload,
+    'Failed to create variant.',
+  );
+}
+
+export async function uploadVariantImageAction(
+  productId: string,
+  variantId: string,
+  formData: FormData,
+): Promise<CatalogActionResult<ProductVariantResponse>> {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) {
+    return { success: false, message: 'Session expired. Please sign in again.' };
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${API_URL}/api/v1/catalog/products/${productId}/variants/${variantId}/image`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+      },
+    );
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to upload variant image.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as ProductVariantResponse,
   };
 }

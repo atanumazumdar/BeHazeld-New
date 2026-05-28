@@ -90,6 +90,7 @@ def list_public_products(
                     PublicVariantResponse(
                         id=v.id,
                         sku_code=v.sku_code,
+                        image_url=v.image_url,
                         mrp=v.mrp,
                         selling_price=v.selling_price,
                         status=v.status,
@@ -147,6 +148,7 @@ def get_public_product(
             PublicVariantResponse(
                 id=v.id,
                 sku_code=v.sku_code,
+                image_url=v.image_url,
                 mrp=v.mrp,
                 selling_price=v.selling_price,
                 status=v.status,

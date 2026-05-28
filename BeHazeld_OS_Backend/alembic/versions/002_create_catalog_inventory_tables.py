@@ -294,6 +294,7 @@ def upgrade() -> None:
         ),
         sa.Column("sku_code", sa.String(100), nullable=False),
         sa.Column("fabric", sa.String(150), nullable=True),
+        sa.Column("image_url", sa.String(500), nullable=True),
         sa.Column("mrp", sa.Numeric(12, 4), nullable=False),
         sa.Column("selling_price", sa.Numeric(12, 4), nullable=False),
         sa.Column("cost_price", sa.Numeric(12, 4), nullable=False),

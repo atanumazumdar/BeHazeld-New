@@ -356,6 +356,7 @@ class CatalogRepository:
         selling_price: Decimal,
         cost_price: Decimal,
         fabric: str | None = None,
+        image_url: str | None = None,
         reorder_level: int = 0,
     ) -> ProductVariant:
         if self.get_variant_by_sku(tenant_id, sku_code) is not None:
@@ -370,10 +371,22 @@ class CatalogRepository:
             selling_price=selling_price,
             cost_price=cost_price,
             fabric=fabric,
+            image_url=image_url,
             reorder_level=reorder_level,
             status="active",
         )
         self.db.add(variant)
+        self.db.flush()
+        return variant
+
+    def update_variant_image_url(
+        self,
+        tenant_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        image_url: str,
+    ) -> ProductVariant:
+        variant = self.get_variant_by_id(tenant_id, variant_id)
+        variant.image_url = image_url
         self.db.flush()
         return variant
 

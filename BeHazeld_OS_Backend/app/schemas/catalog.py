@@ -75,6 +75,7 @@ class CreateVariantRequest(BaseModel):
     selling_price: Annotated[Decimal, Field(gt=0)]
     cost_price: Annotated[Decimal, Field(gt=0)]
     fabric: Annotated[str | None, Field(max_length=150)] = None
+    image_url: Annotated[str | None, Field(max_length=500)] = None
     reorder_level: Annotated[int, Field(ge=0)] = 0
 
 
@@ -186,6 +187,7 @@ class ProductVariantResponse(BaseModel):
     color_id: uuid.UUID
     sku_code: str
     fabric: str | None
+    image_url: str | None
     mrp: Decimal
     selling_price: Decimal
     cost_price: Decimal
@@ -193,3 +195,10 @@ class ProductVariantResponse(BaseModel):
     status: str
     created_at: datetime
     updated_at: datetime
+
+    @field_validator("image_url", mode="before")
+    @classmethod
+    def image_url_must_be_string_or_none(cls, v: object) -> str | None:
+        if v is None or isinstance(v, str):
+            return v
+        return None

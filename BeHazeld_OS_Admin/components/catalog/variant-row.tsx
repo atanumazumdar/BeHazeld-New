@@ -41,9 +41,9 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
   void register;
 
   return (
-    <div className="grid grid-cols-12 gap-2 items-start p-3 rounded-lg bg-stone-50 border border-stone-200">
+    <div className="grid grid-cols-[minmax(6rem,1fr)_minmax(6rem,1fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)_minmax(5rem,0.8fr)_minmax(7rem,1fr)_2.25rem] gap-2 items-start p-3 rounded-lg bg-stone-50 border border-stone-200">
       {/* Size */}
-      <div className="col-span-2">
+      <div>
         <Controller
           name={`variants.${index}.size_id`}
           control={control}
@@ -64,7 +64,7 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
       </div>
 
       {/* Color */}
-      <div className="col-span-2">
+      <div>
         <Controller
           name={`variants.${index}.color_id`}
           control={control}
@@ -85,7 +85,7 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
       </div>
 
       {/* MRP */}
-      <div className="col-span-2">
+      <div>
         <Controller
           name={`variants.${index}.mrp`}
           control={control}
@@ -107,7 +107,7 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
       </div>
 
       {/* Selling Price */}
-      <div className="col-span-2">
+      <div>
         <Controller
           name={`variants.${index}.selling_price`}
           control={control}
@@ -129,7 +129,7 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
       </div>
 
       {/* Cost Price */}
-      <div className="col-span-2">
+      <div>
         <Controller
           name={`variants.${index}.cost_price`}
           control={control}
@@ -151,7 +151,7 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
       </div>
 
       {/* Fabric (optional) */}
-      <div className="col-span-1">
+      <div>
         <Controller
           name={`variants.${index}.fabric`}
           control={control}
@@ -167,8 +167,27 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
         />
       </div>
 
+      {/* Variant image */}
+      <div>
+        <Controller
+          name={`variants.${index}.image_file`}
+          control={control}
+          render={({ field: { onChange, value } }) => (
+            <label className="flex h-9 cursor-pointer items-center justify-center rounded-lg border border-input bg-white px-2 text-xs text-stone-600 hover:bg-stone-50">
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="hidden"
+                onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+              />
+              <span className="truncate">{value ? value.name : 'Upload'}</span>
+            </label>
+          )}
+        />
+      </div>
+
       {/* Remove button */}
-      <div className="col-span-1 flex justify-end">
+      <div className="flex justify-end">
         <Button
           type="button"
           variant="ghost"
