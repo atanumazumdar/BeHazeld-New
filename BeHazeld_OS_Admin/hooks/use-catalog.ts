@@ -9,6 +9,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { importMasterDataAction } from '@/lib/catalog-actions';
 import type {
   BrandResponse,
   CategoryResponse,
@@ -222,13 +223,14 @@ export function useCreateColor() {
 export function useImportMasterData(entityType: MasterDataImportType) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const form = new FormData();
       form.append('file', file);
-      return apiClient.postForm<MasterDataImportResponse>(
-        `/api/v1/catalog/import/master-data?entity_type=${entityType}`,
-        form,
-      );
+      const result = await importMasterDataAction(entityType, form);
+      if (!result.success || !result.data) {
+        throw new Error(result.message ?? 'Failed to import CSV.');
+      }
+      return result.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
   });
