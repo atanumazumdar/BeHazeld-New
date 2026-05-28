@@ -166,6 +166,25 @@ def test_import_master_data_csv_accepts_quoted_whole_rows() -> None:
     )
 
 
+def test_import_master_data_csv_accepts_tab_delimited_exports() -> None:
+    svc, db = _make_service()
+    tenant_id = uuid.uuid4()
+    db.scalars.return_value = []
+    svc.repo.create_category = MagicMock()
+
+    result = svc.import_master_data_csv(
+        tenant_id,
+        "categories",
+        b"name\tdescription\tsort_order\nDresses\tAll dresses\t1\nTops\t\t2\n",
+    )
+
+    assert result.created == 2
+    assert result.errors == []
+    assert svc.repo.create_category.call_args_list[0].kwargs["name"] == "Dresses"
+    assert svc.repo.create_category.call_args_list[0].kwargs["description"] == "All dresses"
+    assert svc.repo.create_category.call_args_list[0].kwargs["sort_order"] == 1
+
+
 def test_create_product_sequence_increments_correctly() -> None:
     """Sequence = count + 1, so the 10th product has seq=10."""
     svc, _ = _make_service()

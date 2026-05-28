@@ -129,7 +129,8 @@ class CatalogService:
         except UnicodeDecodeError:
             text = content.decode("latin-1")
         text = self._normalize_csv_text(text)
-        reader = csv.DictReader(io.StringIO(text))
+        dialect = self._detect_csv_dialect(text)
+        reader = csv.DictReader(io.StringIO(text), dialect=dialect)
         if reader.fieldnames is None:
             raise ValueError("CSV file is empty or missing a header row")
 
@@ -222,6 +223,13 @@ class CatalogService:
             else:
                 normalized_lines.append(line)
         return "\n".join(normalized_lines)
+
+    def _detect_csv_dialect(self, text: str) -> csv.Dialect:
+        sample = text[:4096]
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=",\t;")
+        except csv.Error:
+            return csv.excel
 
     def _existing_master_names(self, tenant_id: uuid.UUID, entity_type: str) -> set[str]:
         models = {
