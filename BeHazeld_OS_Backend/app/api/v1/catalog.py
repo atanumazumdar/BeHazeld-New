@@ -63,7 +63,11 @@ async def import_master_data(
             await file.read(),
         )
     except ValueError as exc:
+        db.rollback()
         raise ValidationError(str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise ValidationError(f"CSV import failed: {exc}") from exc
 
 
 # ── master data — categories ──────────────────────────────────────────────────

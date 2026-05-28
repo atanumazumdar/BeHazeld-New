@@ -13,10 +13,11 @@ import csv
 import io
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
+from app.db.base import Base
 from app.models.catalog import (
     Brand,
     Category,
@@ -27,6 +28,7 @@ from app.models.catalog import (
     ProductVariant,
     Size,
 )
+from app.models.tenant import Tenant  # noqa: F401 - registers tenant FK targets
 from app.repositories.catalog_repository import (
     CatalogRepository,
     generate_product_code,
@@ -121,6 +123,7 @@ class CatalogService:
         content: bytes,
     ) -> MasterDataImportResponse:
         entity_type = entity_type.strip().lower()
+        self._ensure_master_tables_available()
         try:
             text = content.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -169,6 +172,28 @@ class CatalogService:
             created=created,
             skipped=skipped,
             errors=errors,
+        )
+
+    def _ensure_master_tables_available(self) -> None:
+        """Create catalog master tables on first-run production databases."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS catalog"))
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                Category.__table__,
+                ProductGroup.__table__,
+                ProductType.__table__,
+                Brand.__table__,
+                Size.__table__,
+                Color.__table__,
+            ],
         )
 
     def _required_import_columns(self, entity_type: str) -> set[str]:
