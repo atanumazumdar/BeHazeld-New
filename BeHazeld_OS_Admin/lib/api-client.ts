@@ -97,6 +97,17 @@ async function _request<T>(
 export const apiClient = {
   get: <T>(path: string) => _request<T>('GET', path),
   post: <T>(path: string, body?: unknown) => _request<T>('POST', path, body),
+  postForm: async <T>(path: string, body: FormData): Promise<T> => {
+    const response = await fetch(`${BASE_URL}${path}`, {
+      method: 'POST',
+      body,
+      credentials: 'include',
+    });
+    if (!response.ok) {
+      throw await _parseError(response);
+    }
+    return response.json() as Promise<T>;
+  },
   patch: <T>(path: string, body?: unknown) => _request<T>('PATCH', path, body),
   put: <T>(path: string, body?: unknown) => _request<T>('PUT', path, body),
   delete: <T>(path: string) => _request<T>('DELETE', path),

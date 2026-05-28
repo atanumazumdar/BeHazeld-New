@@ -78,6 +78,13 @@ class CreateVariantRequest(BaseModel):
     reorder_level: Annotated[int, Field(ge=0)] = 0
 
 
+class MasterDataImportResponse(BaseModel):
+    entity_type: str
+    created: int
+    skipped: int
+    errors: list[str] = []
+
+
 # ── Response schemas ──────────────────────────────────────────────────────────
 
 class CategoryResponse(BaseModel):

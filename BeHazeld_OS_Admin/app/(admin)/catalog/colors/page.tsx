@@ -1,7 +1,7 @@
 'use client';
 
 import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-page';
-import { useColors, useCreateColor } from '@/hooks/use-catalog';
+import { useColors, useCreateColor, useImportMasterData } from '@/hooks/use-catalog';
 import type { CreateColorPayload } from '@/types/catalog';
 
 function ColorSwatch({ item }: { item: MasterItem }) {
@@ -22,6 +22,7 @@ function ColorSwatch({ item }: { item: MasterItem }) {
 export default function ColorsPage() {
   const { data: colors = [], isLoading } = useColors();
   const createColor = useCreateColor();
+  const importCsv = useImportMasterData('colors');
 
   return (
     <MasterDataPage
@@ -47,6 +48,8 @@ export default function ColorsPage() {
           hex_code: data.hex_code || null,
         } as CreateColorPayload)
       }
+      onImportCsv={(file) => importCsv.mutateAsync(file)}
+      csvColumns={['name', 'hex_code']}
     />
   );
 }

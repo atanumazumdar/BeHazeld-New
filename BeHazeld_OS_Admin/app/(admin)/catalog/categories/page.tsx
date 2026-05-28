@@ -1,12 +1,13 @@
 'use client';
 
 import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-page';
-import { useCategories, useCreateCategory } from '@/hooks/use-catalog';
+import { useCategories, useCreateCategory, useImportMasterData } from '@/hooks/use-catalog';
 import type { CreateCategoryPayload } from '@/types/catalog';
 
 export default function CategoriesPage() {
   const { data: categories = [], isLoading } = useCategories();
   const createCategory = useCreateCategory();
+  const importCsv = useImportMasterData('categories');
 
   return (
     <MasterDataPage
@@ -31,6 +32,8 @@ export default function CategoriesPage() {
           sort_order: Number(data.sort_order ?? 0),
         } as CreateCategoryPayload)
       }
+      onImportCsv={(file) => importCsv.mutateAsync(file)}
+      csvColumns={['name', 'description', 'sort_order']}
     />
   );
 }

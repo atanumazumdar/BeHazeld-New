@@ -97,6 +97,7 @@ export interface CreateVariantPayload {
 
 export interface CreateMasterPayload {
   name: string;
+  description?: string | null;
 }
 
 export interface CreateCategoryPayload {
@@ -113,4 +114,19 @@ export interface CreateColorPayload {
 export interface CreateSizePayload {
   name: string;
   sort_order: number;
+}
+
+export type MasterDataImportType =
+  | 'categories'
+  | 'product-groups'
+  | 'product-types'
+  | 'brands'
+  | 'sizes'
+  | 'colors';
+
+export interface MasterDataImportResponse {
+  entity_type: MasterDataImportType;
+  created: number;
+  skipped: number;
+  errors: string[];
 }

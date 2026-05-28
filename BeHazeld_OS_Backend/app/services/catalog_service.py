@@ -9,8 +9,11 @@ Responsibilities
 - Commit or rollback the session; callers must not manage transactions
 """
 import uuid
+import csv
+import io
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
@@ -38,6 +41,7 @@ from app.schemas.catalog import (
     CreateProductTypeRequest,
     CreateSizeRequest,
     CreateVariantRequest,
+    MasterDataImportResponse,
 )
 from app.services.image_service import ImageService
 
@@ -109,6 +113,138 @@ class CatalogService:
         self.db.commit()
         self.db.refresh(obj)
         return obj
+
+    def import_master_data_csv(
+        self,
+        tenant_id: uuid.UUID,
+        entity_type: str,
+        content: bytes,
+    ) -> MasterDataImportResponse:
+        entity_type = entity_type.strip().lower()
+        text = content.decode("utf-8-sig")
+        reader = csv.DictReader(io.StringIO(text))
+        if reader.fieldnames is None:
+            raise ValueError("CSV file is empty or missing a header row")
+
+        headers = {h.strip().lower() for h in reader.fieldnames if h}
+        required = self._required_import_columns(entity_type)
+        missing = sorted(required - headers)
+        if missing:
+            raise ValueError(f"Missing required CSV columns: {', '.join(missing)}")
+
+        created = 0
+        skipped = 0
+        errors: list[str] = []
+        existing_names = self._existing_master_names(tenant_id, entity_type)
+
+        for line_number, raw_row in enumerate(reader, start=2):
+            row = {
+                (key or "").strip().lower(): (value or "").strip()
+                for key, value in raw_row.items()
+            }
+            name = row.get("name", "")
+            if not name:
+                errors.append(f"Line {line_number}: name is required")
+                continue
+
+            name_key = name.casefold()
+            if name_key in existing_names:
+                skipped += 1
+                continue
+
+            try:
+                self._create_master_from_import_row(tenant_id, entity_type, row)
+                existing_names.add(name_key)
+                created += 1
+            except Exception as exc:  # noqa: BLE001
+                errors.append(f"Line {line_number}: {exc}")
+
+        self.db.commit()
+        return MasterDataImportResponse(
+            entity_type=entity_type,
+            created=created,
+            skipped=skipped,
+            errors=errors,
+        )
+
+    def _required_import_columns(self, entity_type: str) -> set[str]:
+        required_columns = {
+            "categories": {"name"},
+            "product-groups": {"name"},
+            "product-types": {"name"},
+            "brands": {"name"},
+            "sizes": {"name"},
+            "colors": {"name"},
+        }
+        if entity_type not in required_columns:
+            raise ValueError(f"Unsupported master data type '{entity_type}'")
+        return required_columns[entity_type]
+
+    def _existing_master_names(self, tenant_id: uuid.UUID, entity_type: str) -> set[str]:
+        models = {
+            "categories": Category,
+            "product-groups": ProductGroup,
+            "product-types": ProductType,
+            "brands": Brand,
+            "sizes": Size,
+            "colors": Color,
+        }
+        model = models[entity_type]
+        return {
+            name.casefold()
+            for name in self.db.scalars(
+                select(model.name).where(model.tenant_id == tenant_id)
+            )
+        }
+
+    def _create_master_from_import_row(
+        self,
+        tenant_id: uuid.UUID,
+        entity_type: str,
+        row: dict[str, str],
+    ) -> None:
+        name = row["name"]
+        if entity_type == "categories":
+            self.repo.create_category(
+                tenant_id=tenant_id,
+                name=name,
+                description=row.get("description") or None,
+                sort_order=self._parse_non_negative_int(row.get("sort_order"), "sort_order"),
+            )
+        elif entity_type == "product-groups":
+            self.repo.create_product_group(
+                tenant_id=tenant_id,
+                name=name,
+                description=row.get("description") or None,
+            )
+        elif entity_type == "product-types":
+            self.repo.create_product_type(tenant_id=tenant_id, name=name)
+        elif entity_type == "brands":
+            self.repo.create_brand(tenant_id=tenant_id, name=name)
+        elif entity_type == "sizes":
+            self.repo.create_size(
+                tenant_id=tenant_id,
+                name=name,
+                sort_order=self._parse_non_negative_int(row.get("sort_order"), "sort_order"),
+            )
+        elif entity_type == "colors":
+            CreateColorRequest(name=name, hex_code=row.get("hex_code") or None)
+            self.repo.create_color(
+                tenant_id=tenant_id,
+                name=name,
+                hex_code=row.get("hex_code") or None,
+            )
+
+    def _parse_non_negative_int(self, value: str | None, field_name: str) -> int:
+        if value in (None, ""):
+            return 0
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be a whole number") from exc
+        if parsed < 0:
+            raise ValueError(f"{field_name} must be greater than or equal to 0")
+        return parsed
 
     # ── product writes ────────────────────────────────────────────────────────
 

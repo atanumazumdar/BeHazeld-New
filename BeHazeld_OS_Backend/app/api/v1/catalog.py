@@ -30,6 +30,7 @@ from app.schemas.catalog import (
     CreateProductTypeRequest,
     CreateSizeRequest,
     CreateVariantRequest,
+    MasterDataImportResponse,
     ProductGroupResponse,
     ProductResponse,
     ProductTypeResponse,
@@ -39,6 +40,28 @@ from app.schemas.catalog import (
 from app.services.catalog_service import CatalogService
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
+
+
+@router.post(
+    "/import/master-data",
+    response_model=MasterDataImportResponse,
+)
+async def import_master_data(
+    entity_type: str,
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> MasterDataImportResponse:
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise ValidationError("Uploaded file must be a CSV")
+    try:
+        return CatalogService(db).import_master_data_csv(
+            ctx.tenant_id,
+            entity_type,
+            await file.read(),
+        )
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
 
 
 # ── master data — categories ──────────────────────────────────────────────────

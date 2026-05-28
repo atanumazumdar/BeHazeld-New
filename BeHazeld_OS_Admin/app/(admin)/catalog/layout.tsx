@@ -11,6 +11,8 @@ import { cn } from '@/lib/utils';
 
 const CATALOG_TABS = [
   { href: '/catalog/products',   label: 'Products' },
+  { href: '/catalog/product-groups', label: 'Groups' },
+  { href: '/catalog/product-types', label: 'Types' },
   { href: '/catalog/categories', label: 'Categories' },
   { href: '/catalog/brands',     label: 'Brands' },
   { href: '/catalog/sizes',      label: 'Sizes' },

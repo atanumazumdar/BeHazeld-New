@@ -11,9 +11,10 @@
  * entity-specific hooks and metadata as props.
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { ApiError } from '@/types/api';
+import type { MasterDataImportResponse } from '@/types/catalog';
 
 // ── Generic item shape ────────────────────────────────────────────────────────
 
@@ -71,6 +73,8 @@ interface MasterDataPageProps {
   formFields: MasterFormField[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onCreate: (data: any) => Promise<unknown>;
+  onImportCsv?: (file: File) => Promise<MasterDataImportResponse>;
+  csvColumns?: string[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -83,9 +87,13 @@ export function MasterDataPage({
   columns,
   formFields,
   onCreate,
+  onImportCsv,
+  csvColumns,
 }: MasterDataPageProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const defaultValues = Object.fromEntries(
     formFields.map((f) => [f.key, f.defaultValue ?? '']),
@@ -117,20 +125,69 @@ export function MasterDataPage({
     }
   });
 
+  async function handleCsvSelected(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !onImportCsv) return;
+
+    setIsImporting(true);
+    try {
+      const result = await onImportCsv(file);
+      const summary = `${result.created} created, ${result.skipped} skipped`;
+      if (result.errors.length > 0) {
+        toast.warning(`${summary}. ${result.errors.length} row issue${result.errors.length === 1 ? '' : 's'} found.`);
+      } else {
+        toast.success(`${title} imported. ${summary}.`);
+      }
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : `Failed to import ${title.toLowerCase()}.`;
+      toast.error(msg);
+    } finally {
+      setIsImporting(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold text-slate-800">{title}</h1>
           <p className="mt-1 text-sm text-stone-500">{description}</p>
+          {csvColumns && (
+            <p className="mt-1 text-xs text-stone-400">
+              CSV columns: {csvColumns.join(', ')}
+            </p>
+          )}
         </div>
-        <Button
-          onClick={() => setDialogOpen(true)}
-          className="bg-slate-800 hover:bg-slate-700 text-white"
-        >
-          + Add {title.replace(/s$/, '')}
-        </Button>
+        <div className="flex gap-2">
+          {onImportCsv && (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={handleCsvSelected}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isImporting}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {isImporting ? 'Importing…' : 'Import CSV'}
+              </Button>
+            </>
+          )}
+          <Button
+            onClick={() => setDialogOpen(true)}
+            className="bg-slate-800 hover:bg-slate-700 text-white"
+          >
+            + Add {title.replace(/s$/, '')}
+          </Button>
+        </div>
       </div>
 
       {/* Table */}

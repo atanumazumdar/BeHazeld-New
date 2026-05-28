@@ -105,6 +105,46 @@ def test_create_product_raises_if_group_not_found() -> None:
     svc.repo.create_product.assert_not_called()
 
 
+def test_import_master_data_csv_creates_categories() -> None:
+    svc, db = _make_service()
+    tenant_id = uuid.uuid4()
+    db.scalars.return_value = []
+    svc.repo.create_category = MagicMock()
+
+    result = svc.import_master_data_csv(
+        tenant_id,
+        "categories",
+        b"name,description,sort_order\nDresses,All dresses,1\nTops,,2\n",
+    )
+
+    assert result.created == 2
+    assert result.skipped == 0
+    assert result.errors == []
+    assert svc.repo.create_category.call_count == 2
+    assert svc.repo.create_category.call_args_list[0].kwargs["name"] == "Dresses"
+    assert svc.repo.create_category.call_args_list[0].kwargs["sort_order"] == 1
+    db.commit.assert_called_once()
+
+
+def test_import_master_data_csv_skips_existing_names() -> None:
+    svc, db = _make_service()
+    tenant_id = uuid.uuid4()
+    db.scalars.return_value = ["Black"]
+    svc.repo.create_color = MagicMock()
+
+    result = svc.import_master_data_csv(
+        tenant_id,
+        "colors",
+        b"name,hex_code\nBlack,#000000\nRose,#E11D48\n",
+    )
+
+    assert result.created == 1
+    assert result.skipped == 1
+    assert result.errors == []
+    svc.repo.create_color.assert_called_once()
+    assert svc.repo.create_color.call_args.kwargs["name"] == "Rose"
+
+
 def test_create_product_sequence_increments_correctly() -> None:
     """Sequence = count + 1, so the 10th product has seq=10."""
     svc, _ = _make_service()

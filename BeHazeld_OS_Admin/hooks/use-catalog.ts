@@ -19,6 +19,8 @@ import type {
   CreateProductPayload,
   CreateSizePayload,
   CreateVariantPayload,
+  MasterDataImportResponse,
+  MasterDataImportType,
   ProductGroupResponse,
   ProductResponse,
   ProductTypeResponse,
@@ -214,5 +216,20 @@ export function useCreateColor() {
     mutationFn: (data: CreateColorPayload) =>
       apiClient.post<ColorResponse>('/api/v1/catalog/colors', data),
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.colors() }),
+  });
+}
+
+export function useImportMasterData(entityType: MasterDataImportType) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return apiClient.postForm<MasterDataImportResponse>(
+        `/api/v1/catalog/import/master-data?entity_type=${entityType}`,
+        form,
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
   });
 }
