@@ -13,7 +13,9 @@ import {
   createProductAction,
   createMasterDataAction,
   createVariantAction,
+  deleteProductAction,
   importMasterDataAction,
+  listProductsAction,
   listMasterDataAction,
   uploadVariantImageAction,
 } from '@/lib/catalog-actions';
@@ -145,19 +147,19 @@ interface ProductFilters {
 }
 
 export function useProducts(filters: ProductFilters = {}) {
-  const params = new URLSearchParams();
-  if (filters.status) params.set('status', filters.status);
-  if (filters.search) params.set('search', filters.search);
-  if (filters.category_id) params.set('category_id', filters.category_id);
-  if (filters.brand_id) params.set('brand_id', filters.brand_id);
-  if (filters.skip !== undefined) params.set('skip', String(filters.skip));
-  if (filters.limit !== undefined) params.set('limit', String(filters.limit));
-
-  const qs = params.toString();
   return useQuery({
-    queryKey: catalogKeys.products(Object.fromEntries(params)),
-    queryFn: () =>
-      apiClient.get<ProductResponse[]>(`/api/v1/catalog/products${qs ? `?${qs}` : ''}`),
+    queryKey: catalogKeys.products({
+      status: filters.status,
+      search: filters.search,
+      category_id: filters.category_id,
+      brand_id: filters.brand_id,
+      skip: filters.skip === undefined ? undefined : String(filters.skip),
+      limit: filters.limit === undefined ? undefined : String(filters.limit),
+    }),
+    queryFn: async () => {
+      const result = await listProductsAction(filters);
+      return requireActionData(result, 'Failed to load products.') as ProductResponse[];
+    },
   });
 }
 
@@ -217,8 +219,10 @@ export function useUploadVariantImage(productId: string) {
 export function useDeleteProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (productId: string) =>
-      apiClient.delete<ProductResponse>(`/api/v1/catalog/products/${productId}`),
+    mutationFn: async (productId: string) => {
+      const result = await deleteProductAction(productId);
+      return requireActionData(result, 'Failed to archive product.') as ProductResponse;
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.all });
     },

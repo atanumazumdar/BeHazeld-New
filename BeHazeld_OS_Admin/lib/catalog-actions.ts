@@ -53,6 +53,15 @@ type MasterDataCreateResponse =
   | SizeResponse
   | ColorResponse;
 
+interface ProductFilters {
+  status?: string;
+  search?: string;
+  category_id?: string;
+  brand_id?: string;
+  skip?: number;
+  limit?: number;
+}
+
 export interface CatalogActionResult<T> {
   success: boolean;
   data?: T;
@@ -279,6 +288,45 @@ async function authenticatedJsonRequest<T>(
   };
 }
 
+export async function listProductsAction(
+  filters: ProductFilters = {},
+): Promise<CatalogActionResult<ProductResponse[]>> {
+  const params = new URLSearchParams();
+  if (filters.status) params.set('status', filters.status);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.category_id) params.set('category_id', filters.category_id);
+  if (filters.brand_id) params.set('brand_id', filters.brand_id);
+  if (filters.skip !== undefined) params.set('skip', String(filters.skip));
+  if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+
+  const qs = params.toString();
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/catalog/products${qs ? `?${qs}` : ''}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load products.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as ProductResponse[],
+  };
+}
+
 export async function createProductAction(
   payload: CreateProductPayload,
 ): Promise<CatalogActionResult<ProductResponse>> {
@@ -287,6 +335,35 @@ export async function createProductAction(
     payload,
     'Failed to create product.',
   );
+}
+
+export async function deleteProductAction(
+  productId: string,
+): Promise<CatalogActionResult<ProductResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/catalog/products/${productId}`, {
+      method: 'DELETE',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to archive product.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as ProductResponse,
+  };
 }
 
 export async function createVariantAction(
