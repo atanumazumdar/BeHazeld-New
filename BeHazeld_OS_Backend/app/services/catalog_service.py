@@ -121,7 +121,11 @@ class CatalogService:
         content: bytes,
     ) -> MasterDataImportResponse:
         entity_type = entity_type.strip().lower()
-        text = content.decode("utf-8-sig")
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+        text = self._normalize_csv_text(text)
         reader = csv.DictReader(io.StringIO(text))
         if reader.fieldnames is None:
             raise ValueError("CSV file is empty or missing a header row")
@@ -179,6 +183,20 @@ class CatalogService:
         if entity_type not in required_columns:
             raise ValueError(f"Unsupported master data type '{entity_type}'")
         return required_columns[entity_type]
+
+    def _normalize_csv_text(self, text: str) -> str:
+        """
+        Handle spreadsheet exports that wrap a whole comma-separated row in quotes.
+        Example: "name,description" should become name,description.
+        """
+        normalized_lines: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('"') and stripped.endswith('"') and stripped.count('"') == 2:
+                normalized_lines.append(stripped[1:-1])
+            else:
+                normalized_lines.append(line)
+        return "\n".join(normalized_lines)
 
     def _existing_master_names(self, tenant_id: uuid.UUID, entity_type: str) -> set[str]:
         models = {

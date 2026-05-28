@@ -145,6 +145,27 @@ def test_import_master_data_csv_skips_existing_names() -> None:
     assert svc.repo.create_color.call_args.kwargs["name"] == "Rose"
 
 
+def test_import_master_data_csv_accepts_quoted_whole_rows() -> None:
+    svc, db = _make_service()
+    tenant_id = uuid.uuid4()
+    db.scalars.return_value = []
+    svc.repo.create_product_group = MagicMock()
+
+    result = svc.import_master_data_csv(
+        tenant_id,
+        "product-groups",
+        b'"name,description"\n"Accessories,To Compliment U"\n',
+    )
+
+    assert result.created == 1
+    assert result.errors == []
+    svc.repo.create_product_group.assert_called_once_with(
+        tenant_id=tenant_id,
+        name="Accessories",
+        description="To Compliment U",
+    )
+
+
 def test_create_product_sequence_increments_correctly() -> None:
     """Sequence = count + 1, so the 10th product has seq=10."""
     svc, _ = _make_service()
