@@ -20,6 +20,7 @@ from app.core.exceptions import NotFoundError
 from app.db.base import Base
 from app.models.catalog import (
     Brand,
+    Barcode,
     Category,
     Color,
     Product,
@@ -213,6 +214,25 @@ class CatalogService:
                 )
             )
 
+    def _ensure_catalog_product_tables_available(self) -> None:
+        """Create product/SKU catalog tables on first-run production databases."""
+        self._ensure_master_tables_available()
+
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                Product.__table__,
+                ProductVariant.__table__,
+                Barcode.__table__,
+            ],
+        )
+        self._ensure_variant_image_column_available()
+
     def _required_import_columns(self, entity_type: str) -> set[str]:
         required_columns = {
             "categories": {"name"},
@@ -325,6 +345,7 @@ class CatalogService:
         When no product_group_id is supplied the product name is used for both
         the group and name prefix slots of generate_product_code().
         """
+        self._ensure_catalog_product_tables_available()
         seq = self.repo.count_products_by_tenant(tenant_id) + 1
 
         if req.product_group_id is not None:
@@ -365,7 +386,7 @@ class CatalogService:
         """
         Validate size + color existence, then generate the SKU and create the variant.
         """
-        self._ensure_variant_image_column_available()
+        self._ensure_catalog_product_tables_available()
         # Validate parent product exists
         product = self.repo.get_product_by_id(tenant_id, product_id)  # raises NotFoundError
 
@@ -404,7 +425,7 @@ class CatalogService:
         file,
         filename: str | None = None,
     ) -> ProductVariant:
-        self._ensure_variant_image_column_available()
+        self._ensure_catalog_product_tables_available()
         product = self.repo.get_product_by_id(tenant_id, product_id)
         variant = self.repo.get_variant_by_id(tenant_id, variant_id)
         if variant.product_id != product.id:
@@ -452,6 +473,7 @@ class CatalogService:
         category_id: uuid.UUID | None = None,
         brand_id: uuid.UUID | None = None,
     ) -> list[Product]:
+        self._ensure_catalog_product_tables_available()
         return self.repo.list_products(
             tenant_id,
             status=status,
@@ -463,6 +485,7 @@ class CatalogService:
         )
 
     def get_product(self, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:
+        self._ensure_catalog_product_tables_available()
         return self.repo.get_product_by_id(tenant_id, product_id)
 
     def upload_product_image(
@@ -473,6 +496,7 @@ class CatalogService:
         *,
         filename: str | None = None,
     ) -> Product:
+        self._ensure_catalog_product_tables_available()
         self.repo.get_product_by_id(tenant_id, product_id)
         image_url = ImageService().upload_product_image(
             file,
@@ -486,6 +510,7 @@ class CatalogService:
         return product
 
     def list_variants(self, tenant_id: uuid.UUID, product_id: uuid.UUID) -> list[ProductVariant]:
+        self._ensure_catalog_product_tables_available()
         return self.repo.list_variants_by_product(tenant_id, product_id)
 
     def soft_delete_product(self, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:
