@@ -216,7 +216,7 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-[calc(100vw-2rem)] sm:max-w-[1100px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-slate-800">
             {step === 1 ? 'New Product — Basic Details' : 'Add Variants'}

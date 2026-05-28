@@ -43,6 +43,7 @@ import {
 } from '@/hooks/use-catalog';
 import { ApiError } from '@/types/api';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
+import { AddVariantDialog } from './add-variant-dialog';
 
 const PAGE_SIZE = 20;
 
@@ -57,6 +58,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
   const [brandId, setBrandId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<string>('active');
   const [skip, setSkip] = useState(0);
+  const [variantProduct, setVariantProduct] = useState<ProductResponse | null>(null);
 
   const { data: categories = [] } = useCategories();
   const { data: brands = [] } = useBrands();
@@ -174,7 +176,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
         <Table>
           <TableHeader>
             <TableRow className="bg-stone-50 hover:bg-stone-50">
-              <TableHead className="text-stone-600 font-medium">Code</TableHead>
+              <TableHead className="text-stone-600 font-medium">Product Code</TableHead>
               <TableHead className="text-stone-600 font-medium">Name</TableHead>
               <TableHead className="text-stone-600 font-medium">Color</TableHead>
               <TableHead className="text-stone-600 font-medium">Size</TableHead>
@@ -207,7 +209,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
               rows.map(({ product, variant }) => (
                 <TableRow key={variant?.id ?? product.id} className="hover:bg-stone-50/60">
                   <TableCell className="font-mono text-sm text-stone-700">
-                    {variant?.sku_code ?? product.product_code}
+                    {product.product_code}
                   </TableCell>
                   <TableCell className="font-medium text-slate-800">{product.name}</TableCell>
                   <TableCell className="text-stone-600 text-sm">
@@ -241,6 +243,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
                       productId={product.id}
                       variantId={variant?.id ?? null}
                       hasImage={Boolean(variant?.image_url)}
+                      onAddVariant={() => setVariantProduct(product)}
                       onDelete={handleDelete}
                     />
                   </TableCell>
@@ -275,6 +278,14 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
           </Button>
         </div>
       </div>
+
+      <AddVariantDialog
+        product={variantProduct}
+        open={Boolean(variantProduct)}
+        onOpenChange={(open) => {
+          if (!open) setVariantProduct(null);
+        }}
+      />
     </div>
   );
 }

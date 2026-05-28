@@ -196,6 +196,7 @@ export function useCreateVariant(productId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });
+      qc.invalidateQueries({ queryKey: catalogKeys.all });
     },
   });
 }

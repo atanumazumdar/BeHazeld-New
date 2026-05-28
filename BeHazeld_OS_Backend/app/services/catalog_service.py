@@ -339,11 +339,7 @@ class CatalogService:
         self, tenant_id: uuid.UUID, req: CreateProductRequest
     ) -> Product:
         """
-        Auto-generate product_code from group name (or product name) + sequence.
-
-        Sequence = count_products_by_tenant() + 1  (1-based, ever-increasing).
-        When no product_group_id is supplied the product name is used for both
-        the group and name prefix slots of generate_product_code().
+        Auto-generate product_code from the first letters of the product name.
         """
         self._ensure_catalog_product_tables_available()
         seq = self.repo.count_products_by_tenant(tenant_id) + 1

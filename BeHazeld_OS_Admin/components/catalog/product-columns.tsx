@@ -16,6 +16,7 @@ interface ProductActionsProps {
   productId: string;
   variantId: string | null;
   hasImage: boolean;
+  onAddVariant: () => void;
   onDelete: (id: string) => void;
 }
 
@@ -35,7 +36,13 @@ export function ProductStatusBadge({ status }: { status: string }) {
   );
 }
 
-export function ProductRowActions({ productId, variantId, hasImage, onDelete }: ProductActionsProps) {
+export function ProductRowActions({
+  productId,
+  variantId,
+  hasImage,
+  onAddVariant,
+  onDelete,
+}: ProductActionsProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const uploadVariantImage = useUploadVariantImage(productId);
 
@@ -62,6 +69,15 @@ export function ProductRowActions({ productId, variantId, hasImage, onDelete }: 
         className="hidden"
         onChange={handlePhotoChange}
       />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-slate-700 hover:bg-stone-100"
+        onClick={onAddVariant}
+      >
+        Add Variant
+      </Button>
       <Button
         type="button"
         variant="ghost"
