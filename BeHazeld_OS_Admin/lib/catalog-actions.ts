@@ -22,6 +22,8 @@ import type {
 } from '@/types/catalog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+const ACCESS_MAX_AGE = 30 * 60;
+const REFRESH_MAX_AGE = 7 * 24 * 60 * 60;
 
 export interface ImportMasterDataResult {
   success: boolean;
@@ -71,6 +73,69 @@ async function getAccessToken(): Promise<string | null> {
   return cookieStore.get('access_token')?.value ?? null;
 }
 
+async function refreshAccessToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  const refreshToken = cookieStore.get('refresh_token')?.value;
+
+  if (!refreshToken) return null;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/v1/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+  } catch {
+    return null;
+  }
+
+  if (!response.ok) return null;
+
+  const body = await response.json();
+  const isProduction = process.env.NODE_ENV === 'production';
+  const baseOptions = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: 'lax' as const,
+    path: '/',
+  };
+
+  cookieStore.set('access_token', body.access_token, {
+    ...baseOptions,
+    maxAge: ACCESS_MAX_AGE,
+  });
+  cookieStore.set('refresh_token', body.refresh_token, {
+    ...baseOptions,
+    maxAge: REFRESH_MAX_AGE,
+  });
+
+  return body.access_token as string;
+}
+
+async function fetchWithAuth(path: string, init: RequestInit): Promise<Response | null> {
+  const accessToken = await getAccessToken();
+
+  if (!accessToken) return null;
+
+  const withAuth = (token: string): RequestInit => ({
+    ...init,
+    headers: {
+      ...(init.headers ?? {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  let response = await fetch(`${API_URL}${path}`, withAuth(accessToken));
+  if (response.status !== 401) return response;
+
+  const refreshedToken = await refreshAccessToken();
+  if (!refreshedToken) return response;
+
+  response = await fetch(`${API_URL}${path}`, withAuth(refreshedToken));
+  return response;
+}
+
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const body = await response.json();
@@ -84,21 +149,16 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
 export async function listMasterDataAction(
   entityType: MasterDataImportType,
 ): Promise<CatalogActionResult<MasterDataListResponse>> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    return { success: false, message: 'Session expired. Please sign in again.' };
-  }
-
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${MASTER_DATA_ENDPOINTS[entityType]}`, {
+    const result = await fetchWithAuth(MASTER_DATA_ENDPOINTS[entityType], {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
       cache: 'no-store',
     });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
   } catch {
     return { success: false, message: 'Unable to reach the server. Please try again.' };
   }
@@ -120,22 +180,19 @@ export async function createMasterDataAction(
   entityType: MasterDataImportType,
   payload: MasterDataCreatePayload,
 ): Promise<CatalogActionResult<MasterDataCreateResponse>> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    return { success: false, message: 'Session expired. Please sign in again.' };
-  }
-
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${MASTER_DATA_ENDPOINTS[entityType]}`, {
+    const result = await fetchWithAuth(MASTER_DATA_ENDPOINTS[entityType], {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
   } catch {
     return { success: false, message: 'Unable to reach the server. Please try again.' };
   }
@@ -157,24 +214,19 @@ export async function importMasterDataAction(
   entityType: MasterDataImportType,
   formData: FormData,
 ): Promise<ImportMasterDataResult> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    return { success: false, message: 'Session expired. Please sign in again.' };
-  }
-
   let response: Response;
   try {
-    response = await fetch(
-      `${API_URL}/api/v1/catalog/import/master-data?entity_type=${entityType}`,
+    const result = await fetchWithAuth(
+      `/api/v1/catalog/import/master-data?entity_type=${entityType}`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
         body: formData,
       },
     );
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
   } catch {
     return { success: false, message: 'Unable to reach the server. Please try again.' };
   }
@@ -197,22 +249,19 @@ async function authenticatedJsonRequest<T>(
   payload: unknown,
   fallback: string,
 ): Promise<CatalogActionResult<T>> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    return { success: false, message: 'Session expired. Please sign in again.' };
-  }
-
   let response: Response;
   try {
-    response = await fetch(`${API_URL}${path}`, {
+    const result = await fetchWithAuth(path, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
   } catch {
     return { success: false, message: 'Unable to reach the server. Please try again.' };
   }
@@ -256,24 +305,19 @@ export async function uploadVariantImageAction(
   variantId: string,
   formData: FormData,
 ): Promise<CatalogActionResult<ProductVariantResponse>> {
-  const accessToken = await getAccessToken();
-
-  if (!accessToken) {
-    return { success: false, message: 'Session expired. Please sign in again.' };
-  }
-
   let response: Response;
   try {
-    response = await fetch(
-      `${API_URL}/api/v1/catalog/products/${productId}/variants/${variantId}/image`,
+    const result = await fetchWithAuth(
+      `/api/v1/catalog/products/${productId}/variants/${variantId}/image`,
       {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
         body: formData,
       },
     );
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
   } catch {
     return { success: false, message: 'Unable to reach the server. Please try again.' };
   }

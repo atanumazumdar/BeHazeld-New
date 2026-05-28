@@ -48,7 +48,6 @@ import {
   useBrands,
   useUploadVariantImage,
 } from '@/hooks/use-catalog';
-import { ApiError } from '@/types/api';
 
 // ── Form shape ────────────────────────────────────────────────────────────────
 
@@ -156,7 +155,7 @@ export function CreateProductWizard({ open, onOpenChange }: CreateProductWizardP
       setCreatedProductId(product.id);
       setStep(2);
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : 'Failed to create product.';
+      const msg = err instanceof Error ? err.message : 'Failed to create product.';
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
