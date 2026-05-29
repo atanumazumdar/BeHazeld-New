@@ -26,6 +26,13 @@ class CreateBinRequest(BaseModel):
     is_default: bool = False
 
 
+class InventoryLocationImportResponse(BaseModel):
+    created_locations: int
+    created_bins: int
+    skipped: int
+    errors: list[str]
+
+
 class RecordMovementRequest(BaseModel):
     product_variant_id: uuid.UUID
     location_id: uuid.UUID

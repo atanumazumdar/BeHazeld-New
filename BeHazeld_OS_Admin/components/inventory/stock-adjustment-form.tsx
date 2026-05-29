@@ -11,9 +11,10 @@
  *   - On success → parent's onSuccess() is called so the ledger / balance refreshes
  */
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
+import { Download, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-import { useLocations, useRecordMovement } from '@/hooks/use-inventory';
+import { useImportLocationsBins, useLocations, useRecordMovement } from '@/hooks/use-inventory';
 import { ApiError } from '@/types/api';
 import type { MovementType } from '@/types/inventory';
 
@@ -57,6 +58,8 @@ const MANUAL_MOVEMENT_TYPES = Object.keys(MOVEMENT_LABELS) as MovementType[];
 export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFormProps) {
   const { data: locations = [] } = useLocations();
   const recordMovement = useRecordMovement();
+  const importLocationsBins = useImportLocationsBins();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const bins =
@@ -107,11 +110,75 @@ export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFor
     }
   });
 
+  const handleCsvSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const result = await importLocationsBins.mutateAsync(file);
+      const summary = `${result.created_locations} location${result.created_locations === 1 ? '' : 's'}, ${result.created_bins} bin${result.created_bins === 1 ? '' : 's'}, ${result.skipped} skipped`;
+      if (result.errors.length > 0) {
+        toast.warning(`CSV imported with issues: ${summary}.`);
+      } else {
+        toast.success(`CSV imported: ${summary}.`);
+      }
+    } catch (err) {
+      const msg = err instanceof ApiError || err instanceof Error ? err.message : 'Failed to import CSV.';
+      toast.error(msg);
+    }
+  };
+
+  const downloadCsvTemplate = () => {
+    const csv = [
+      'location_name,address,bin_name,is_default',
+      'Main Store,Shop floor,Front Rack,true',
+      'Main Store,Shop floor,Back Stock,false',
+      'Warehouse,Warehouse address,Main,true',
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'inventory-locations-bins-template.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-xl border border-stone-200 bg-white p-5">
-      <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
-        Record Stock Movement
-      </h3>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-700 uppercase tracking-wide">
+            Record Stock Movement
+          </h3>
+          <p className="mt-1 text-xs text-stone-400">
+            CSV columns: location_name, address, bin_name, is_default
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleCsvSelected}
+          />
+          <Button type="button" variant="outline" onClick={downloadCsvTemplate}>
+            <Download className="mr-2 h-4 w-4" />
+            CSV Template
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={importLocationsBins.isPending}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="mr-2 h-4 w-4" />
+            {importLocationsBins.isPending ? 'Importing...' : 'Import Locations/Bins'}
+          </Button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 gap-4">
         {/* Location */}

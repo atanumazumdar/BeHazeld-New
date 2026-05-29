@@ -9,16 +9,18 @@ POST /movements                          : inventory.stock.adjust
 """
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import TenantContext, get_current_tenant, require_permission
+from app.core.exceptions import ValidationError
 from app.db.session import get_db
 from app.repositories.inventory_repository import InventoryRepository
 from app.repositories.tenant_repository import TenantRepository
 from app.schemas.inventory import (
     BinResponse,
     CreateBinRequest,
+    InventoryLocationImportResponse,
     LocationResponse,
     RecordMovementRequest,
     StockBalanceResponse,
@@ -27,6 +29,30 @@ from app.schemas.inventory import (
 from app.services.inventory_service import InventoryService
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
+
+
+@router.post(
+    "/import/locations-bins",
+    response_model=InventoryLocationImportResponse,
+)
+async def import_locations_bins(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("inventory.bins.create")),
+    db: Session = Depends(get_db),
+) -> InventoryLocationImportResponse:
+    is_csv_filename = bool(file.filename and file.filename.lower().endswith(".csv"))
+    is_csv_content = file.content_type in {"text/csv", "application/csv", "application/vnd.ms-excel"}
+    if not is_csv_filename and not is_csv_content:
+        raise ValidationError("Uploaded file must be a CSV")
+
+    try:
+        return InventoryService(db).import_locations_bins_csv(ctx.tenant_id, await file.read())
+    except ValueError as exc:
+        db.rollback()
+        raise ValidationError(str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise ValidationError(f"CSV import failed: {exc}") from exc
 
 
 # ── Bins ──────────────────────────────────────────────────────────────────────

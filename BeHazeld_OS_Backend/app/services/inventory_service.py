@@ -21,15 +21,23 @@ Sign convention (quantity_change on StockLedger):
   - → outward (SALE_OUT, ADJUSTMENT_OUT, TRANSFER_OUT)
 """
 import uuid
+import csv
+import io
 from decimal import Decimal
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError, StockNotAvailableError
+from app.core.exceptions import NotFoundError, StockNotAvailableError, ValidationError
 from app.models.inventory import Bin, MovementType, StockBalance, StockBatch, StockLedger
+from app.models.tenant import Company, Location
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.inventory_repository import InventoryRepository
-from app.schemas.inventory import CreateBinRequest, RecordMovementRequest
+from app.schemas.inventory import (
+    CreateBinRequest,
+    InventoryLocationImportResponse,
+    RecordMovementRequest,
+)
 
 # Movement types that remove stock — used to set sign and gate availability check.
 _OUTWARD_TYPES: frozenset[MovementType] = frozenset(
@@ -72,6 +80,99 @@ class InventoryService:
 
     def list_bins(self, tenant_id: uuid.UUID, location_id: uuid.UUID) -> list[Bin]:
         return self.repo.list_bins_by_location(tenant_id, location_id)
+
+    def import_locations_bins_csv(
+        self,
+        tenant_id: uuid.UUID,
+        content: bytes,
+    ) -> InventoryLocationImportResponse:
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+
+        text = self._normalize_csv_text(text)
+        dialect = self._detect_csv_dialect(text)
+        reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+        if reader.fieldnames is None:
+            raise ValueError("CSV file is empty or missing a header row")
+
+        headers = {h.strip().lower() for h in reader.fieldnames if h}
+        missing = {"location_name"} - headers
+        if missing:
+            raise ValueError(f"Missing required CSV columns: {', '.join(sorted(missing))}")
+
+        company = self._get_default_company(tenant_id)
+        existing_locations = self._location_map(tenant_id)
+        created_locations = 0
+        created_bins = 0
+        skipped = 0
+        errors: list[str] = []
+
+        try:
+            for line_number, raw_row in enumerate(reader, start=2):
+                row = {
+                    (key or "").strip().lower(): (value or "").strip()
+                    for key, value in raw_row.items()
+                }
+                location_name = row.get("location_name", "")
+                if not location_name:
+                    errors.append(f"Line {line_number}: location_name is required")
+                    continue
+
+                location_key = location_name.casefold()
+                location = existing_locations.get(location_key)
+                created_location_this_row = False
+                if location is None:
+                    location = Location(
+                        tenant_id=tenant_id,
+                        company_id=company.id,
+                        name=location_name,
+                        address=row.get("address") or None,
+                        is_active=True,
+                    )
+                    self.db.add(location)
+                    self.db.flush()
+                    existing_locations[location_key] = location
+                    created_locations += 1
+                    created_location_this_row = True
+
+                    if not row.get("bin_name"):
+                        self.repo.create_bin(tenant_id, location.id, "Main", is_default=True)
+                        created_bins += 1
+
+                bin_name = row.get("bin_name", "")
+                if not bin_name:
+                    if not created_location_this_row:
+                        skipped += 1
+                    continue
+
+                existing_bins = {
+                    bin_obj.name.casefold(): bin_obj
+                    for bin_obj in self.repo.list_bins_by_location(tenant_id, location.id)
+                }
+                bin_key = bin_name.casefold()
+                if bin_key in existing_bins:
+                    skipped += 1
+                    continue
+
+                is_default = self._parse_bool(row.get("is_default", "")) or not existing_bins
+                if is_default:
+                    self._clear_default_bins(tenant_id, location.id)
+                self.repo.create_bin(tenant_id, location.id, bin_name, is_default=is_default)
+                created_bins += 1
+
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return InventoryLocationImportResponse(
+            created_locations=created_locations,
+            created_bins=created_bins,
+            skipped=skipped,
+            errors=errors,
+        )
 
     # ── Atomic stock movement ─────────────────────────────────────────────────
 
@@ -195,3 +296,45 @@ class InventoryService:
         bin_id: uuid.UUID,
     ) -> StockBalance | None:
         return self.repo.get_balance(tenant_id, product_variant_id, location_id, bin_id)
+
+    def _get_default_company(self, tenant_id: uuid.UUID) -> Company:
+        company = self.db.scalar(
+            select(Company)
+            .where(Company.tenant_id == tenant_id, Company.is_active.is_(True))
+            .order_by(Company.name)
+        )
+        if company is None:
+            raise ValidationError("No active company found for this tenant")
+        return company
+
+    def _location_map(self, tenant_id: uuid.UUID) -> dict[str, Location]:
+        locations = self.db.scalars(
+            select(Location)
+            .where(Location.tenant_id == tenant_id, Location.is_active.is_(True))
+            .order_by(Location.name)
+        )
+        return {location.name.casefold(): location for location in locations}
+
+    def _clear_default_bins(self, tenant_id: uuid.UUID, location_id: uuid.UUID) -> None:
+        for bin_obj in self.repo.list_bins_by_location(tenant_id, location_id):
+            bin_obj.is_default = False
+
+    def _parse_bool(self, value: str) -> bool:
+        return value.strip().casefold() in {"1", "true", "yes", "y", "default"}
+
+    def _normalize_csv_text(self, text: str) -> str:
+        normalized_lines: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('"') and stripped.endswith('"') and stripped.count('"') == 2:
+                normalized_lines.append(stripped[1:-1])
+            else:
+                normalized_lines.append(line)
+        return "\n".join(normalized_lines)
+
+    def _detect_csv_dialect(self, text: str) -> csv.Dialect:
+        sample = text[:4096]
+        try:
+            return csv.Sniffer().sniff(sample, delimiters=",\t;")
+        except csv.Error:
+            return csv.excel

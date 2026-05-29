@@ -20,6 +20,13 @@ export interface LocationResponse {
   bins: BinResponse[];
 }
 
+export interface InventoryLocationImportResponse {
+  created_locations: number;
+  created_bins: number;
+  skipped: number;
+  errors: string[];
+}
+
 export type MovementType =
   | 'opening_stock'
   | 'purchase_in'

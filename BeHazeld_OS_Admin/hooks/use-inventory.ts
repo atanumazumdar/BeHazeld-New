@@ -13,6 +13,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import type {
+  InventoryLocationImportResponse,
   LocationResponse,
   RecordMovementPayload,
   StockBalanceResponse,
@@ -104,5 +105,20 @@ export function useRecordMovement() {
         ),
       });
     },
+  });
+}
+
+export function useImportLocationsBins() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return apiClient.postForm<InventoryLocationImportResponse>(
+        '/api/v1/inventory/import/locations-bins',
+        form,
+      );
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.locations() }),
   });
 }
