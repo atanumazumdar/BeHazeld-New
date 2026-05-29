@@ -45,9 +45,9 @@ function formatMarginPercent(costPrice: string | null | undefined, sellingPrice:
   const cost = Number(costPrice);
   const sell = Number(sellingPrice);
 
-  if (!Number.isFinite(cost) || !Number.isFinite(sell) || sell <= 0) return '—';
+  if (!Number.isFinite(cost) || !Number.isFinite(sell) || cost <= 0) return '—';
 
-  const margin = ((sell - cost) / sell) * 100;
+  const margin = ((sell - cost) / cost) * 100;
   return `${margin.toLocaleString('en-IN', {
     maximumFractionDigits: 0,
     minimumFractionDigits: 0,
