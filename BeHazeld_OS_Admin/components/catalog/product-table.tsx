@@ -53,6 +53,18 @@ interface ProductTableProps {
   onCreateClick: () => void;
 }
 
+function formatWholeAmount(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '—';
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+
+  return amount.toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
+}
+
 export function ProductTable({ onCreateClick }: ProductTableProps) {
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 400);
@@ -180,19 +192,19 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
 
       {/* Table */}
       <div className="rounded-lg border border-stone-200 bg-white overflow-hidden">
-        <Table>
+        <Table className="min-w-[1180px]">
           <TableHeader>
             <TableRow className="bg-stone-50 hover:bg-stone-50">
-              <TableHead className="text-stone-600 font-medium">Product Code</TableHead>
-              <TableHead className="text-stone-600 font-medium">Name</TableHead>
-              <TableHead className="text-stone-600 font-medium">Color</TableHead>
-              <TableHead className="text-stone-600 font-medium">Size</TableHead>
-              <TableHead className="text-stone-600 font-medium">MRP</TableHead>
-              <TableHead className="text-stone-600 font-medium">Cost</TableHead>
-              <TableHead className="text-stone-600 font-medium">Selling</TableHead>
+              <TableHead className="w-40 min-w-40 text-stone-600 font-medium">Product Code</TableHead>
+              <TableHead className="min-w-64 text-stone-600 font-medium">Name</TableHead>
+              <TableHead className="w-32 text-stone-600 font-medium">Color</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium">Size</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium text-right">MRP</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium text-right">Cost</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium text-right">Selling</TableHead>
               <TableHead className="text-stone-600 font-medium">Picture</TableHead>
               <TableHead className="text-stone-600 font-medium">Status</TableHead>
-              <TableHead className="text-stone-600 font-medium text-right">Actions</TableHead>
+              <TableHead className="min-w-[440px] text-stone-600 font-medium text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -215,7 +227,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
             ) : (
               rows.map(({ product, variant }) => (
                 <TableRow key={variant?.id ?? product.id} className="hover:bg-stone-50/60">
-                  <TableCell className="font-mono text-sm text-stone-700">
+                  <TableCell className="font-mono text-sm text-stone-700 whitespace-nowrap">
                     {product.product_code}
                   </TableCell>
                   <TableCell className="font-medium text-slate-800">{product.name}</TableCell>
@@ -225,14 +237,14 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
                   <TableCell className="text-stone-600 text-sm">
                     {variant ? sizeNameById.get(variant.size_id) ?? '—' : '—'}
                   </TableCell>
-                  <TableCell className="text-stone-600 text-sm">
-                    {variant?.mrp ?? '—'}
+                  <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+                    {formatWholeAmount(variant?.mrp)}
                   </TableCell>
-                  <TableCell className="text-stone-600 text-sm">
-                    {variant?.cost_price ?? '—'}
+                  <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+                    {formatWholeAmount(variant?.cost_price)}
                   </TableCell>
-                  <TableCell className="text-stone-600 text-sm">
-                    {variant?.selling_price ?? '—'}
+                  <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+                    {formatWholeAmount(variant?.selling_price)}
                   </TableCell>
                   <TableCell>
                     <Badge
