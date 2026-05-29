@@ -13,7 +13,7 @@
 
 import { useState } from 'react';
 import { useStockSummary, useLedger, useLocations } from '@/hooks/use-inventory';
-import { useProducts } from '@/hooks/use-catalog';
+import { useVariant } from '@/hooks/use-catalog';
 import { StockAdjustmentForm } from '@/components/inventory/stock-adjustment-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -72,7 +72,7 @@ export default function InventoryVariantPage({ params, searchParams }: PageProps
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
 
   const { data: locations = [] } = useLocations();
-  const { data: products = [] } = useProducts({ limit: 500 });
+  const { data: currentVariant } = useVariant(variantId);
   const { data: summary = [], isLoading: summaryLoading } = useStockSummary(variantId);
   const { data: ledger = [], isLoading: ledgerLoading } = useLedger(
     variantId,
@@ -83,9 +83,6 @@ export default function InventoryVariantPage({ params, searchParams }: PageProps
     locations.find((l) => l.id === id)?.name ?? id.slice(0, 8);
   const binName = (locationId: string, binId: string) =>
     locations.find((l) => l.id === locationId)?.bins.find((b) => b.id === binId)?.name ?? binId.slice(0, 8);
-  const currentVariant = products
-    .flatMap((product) => product.variants ?? [])
-    .find((variant) => variant.id === variantId);
   const queryCost = searchParams?.cost && searchParams.cost !== 'null' ? searchParams.cost : null;
   const skuLabel = currentVariant?.sku_code ?? searchParams?.sku ?? variantId.slice(0, 8);
   const defaultUnitCost = currentVariant?.cost_price ?? queryCost;

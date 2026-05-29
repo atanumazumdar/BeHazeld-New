@@ -421,6 +421,18 @@ def delete_product(
 # ── variants ──────────────────────────────────────────────────────────────────
 
 @router.get(
+    "/variants/{variant_id}",
+    response_model=ProductVariantResponse,
+)
+def get_variant(
+    variant_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.view")),
+    db: Session = Depends(get_db),
+) -> ProductVariantResponse:
+    return CatalogService(db).get_variant(ctx.tenant_id, variant_id)  # type: ignore[return-value]
+
+
+@router.get(
     "/products/{product_id}/variants",
     response_model=list[ProductVariantResponse],
 )

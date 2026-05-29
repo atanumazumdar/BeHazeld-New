@@ -15,6 +15,7 @@ import {
   createVariantAction,
   deleteMasterDataAction,
   deleteProductAction,
+  getVariantAction,
   importMasterDataAction,
   listProductsAction,
   listMasterDataAction,
@@ -77,6 +78,8 @@ export const catalogKeys = {
     [...catalogKeys.all, 'products', filters] as const,
   variants: (productId: string) =>
     [...catalogKeys.all, 'variants', productId] as const,
+  variant: (variantId: string) =>
+    [...catalogKeys.all, 'variant', variantId] as const,
 };
 
 // ── Master data queries ───────────────────────────────────────────────────────
@@ -175,6 +178,17 @@ export function useVariants(productId: string) {
     queryFn: () =>
       apiClient.get<ProductVariantResponse[]>(`/api/v1/catalog/products/${productId}/variants`),
     enabled: Boolean(productId),
+  });
+}
+
+export function useVariant(variantId: string) {
+  return useQuery({
+    queryKey: catalogKeys.variant(variantId),
+    queryFn: async () => {
+      const result = await getVariantAction(variantId);
+      return requireActionData(result, 'Failed to load variant.') as ProductVariantResponse;
+    },
+    enabled: Boolean(variantId),
   });
 }
 

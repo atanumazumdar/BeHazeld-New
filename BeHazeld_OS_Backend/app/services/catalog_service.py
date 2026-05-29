@@ -696,6 +696,10 @@ class CatalogService:
         self._ensure_catalog_product_tables_available()
         return self.repo.list_variants_by_product(tenant_id, product_id)
 
+    def get_variant(self, tenant_id: uuid.UUID, variant_id: uuid.UUID) -> ProductVariant:
+        self._ensure_catalog_product_tables_available()
+        return self.repo.get_variant_by_id(tenant_id, variant_id)
+
     def soft_delete_product(self, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:
         product = self.repo.soft_delete_product(tenant_id, product_id)
         self.db.commit()
