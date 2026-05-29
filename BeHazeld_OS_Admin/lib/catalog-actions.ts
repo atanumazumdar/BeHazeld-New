@@ -150,11 +150,21 @@ async function fetchWithAuth(path: string, init: RequestInit): Promise<Response 
 async function readErrorMessage(response: Response, fallback: string): Promise<string> {
   try {
     const body = await response.json();
-    if (body.message) return body.message;
+    if (typeof body.message === 'string' && body.message.length > 0) {
+      return body.message;
+    }
+    if (typeof body.detail === 'string' && body.detail.length > 0) {
+      return body.detail;
+    }
+    if (Array.isArray(body.detail) && body.detail.length > 0) {
+      return body.detail
+        .map((item: { msg?: string; message?: string }) => item.msg ?? item.message ?? JSON.stringify(item))
+        .join('; ');
+    }
   } catch {
     // ignore parse error
   }
-  return fallback;
+  return `${fallback} (HTTP ${response.status})`;
 }
 
 export async function listMasterDataAction(

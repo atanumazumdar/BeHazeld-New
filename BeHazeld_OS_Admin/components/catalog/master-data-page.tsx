@@ -150,7 +150,10 @@ export function MasterDataPage({
       handleClose();
     } catch (err) {
       const action = editingItem ? 'update' : 'create';
-      const msg = err instanceof ApiError ? err.message : `Failed to ${action} ${title.toLowerCase()}.`;
+      const msg =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : `Failed to ${action} ${title.toLowerCase()}.`;
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -165,7 +168,10 @@ export function MasterDataPage({
       await onDelete(item.id);
       toast.success(`${singularTitle} archived successfully.`);
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : `Failed to archive ${title.toLowerCase()}.`;
+      const msg =
+        err instanceof ApiError || err instanceof Error
+          ? err.message
+          : `Failed to archive ${title.toLowerCase()}.`;
       toast.error(msg);
     }
   };
