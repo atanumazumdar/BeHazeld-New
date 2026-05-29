@@ -330,13 +330,28 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
         {/* Quantity */}
         <div className="space-y-1.5">
           <Label>Quantity <span className="text-red-500">*</span></Label>
-          <Input
-            {...register('quantity', { required: true, min: 0.01 })}
-            type="number"
-            step="0.01"
-            placeholder="e.g. 50"
-            className={`bg-white ${errors.quantity ? 'border-red-400' : ''}`}
+          <Controller
+            name="quantity"
+            control={control}
+            rules={{
+              required: true,
+              validate: (value) => Number(value) >= 1,
+            }}
+            render={({ field }) => (
+              <Input
+                {...field}
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                placeholder="e.g. 50"
+                className={`bg-white ${errors.quantity ? 'border-red-400' : ''}`}
+              />
+            )}
           />
+          {errors.quantity && (
+            <p className="text-xs text-red-500">Quantity must be 1 or more.</p>
+          )}
         </div>
 
         {/* Unit cost */}
