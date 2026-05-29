@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
-import { Download, Upload } from 'lucide-react';
+import { Download, HelpCircle, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 import { useImportLocationsBins, useLocations, useRecordMovement } from '@/hooks/use-inventory';
 import { ApiError } from '@/types/api';
@@ -256,7 +257,33 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
 
         {/* Movement type */}
         <div className="space-y-1.5">
-          <Label>Movement Type <span className="text-red-500">*</span></Label>
+          <div className="flex items-center gap-1.5">
+            <Label>Movement Type <span className="text-red-500">*</span></Label>
+            <TooltipProvider delay={150}>
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      className="inline-flex h-4 w-4 items-center justify-center rounded-full text-stone-400 hover:text-slate-700"
+                      aria-label="Movement type help"
+                    />
+                  }
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </TooltipTrigger>
+                <TooltipContent side="right" align="start" className="max-w-sm items-start text-left leading-relaxed">
+                  <div className="space-y-1">
+                    <div><span className="font-semibold">opening_stock:</span> first time adding stock for this SKU</div>
+                    <div><span className="font-semibold">adjustment_in:</span> increase stock manually</div>
+                    <div><span className="font-semibold">adjustment_out:</span> reduce stock manually</div>
+                    <div><span className="font-semibold">purchase_in:</span> stock received from purchase/vendor</div>
+                    <div><span className="font-semibold">return_in:</span> stock returned by customer</div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           <Controller
             name="movement_type"
             control={control}
