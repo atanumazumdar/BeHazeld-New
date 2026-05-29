@@ -4,6 +4,7 @@ import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-pag
 import {
   useBrands,
   useCreateBrand,
+  useDeleteMasterData,
   useImportMasterData,
   useUpdateMasterData,
 } from '@/hooks/use-catalog';
@@ -12,6 +13,7 @@ export default function BrandsPage() {
   const { data: brands = [], isLoading } = useBrands();
   const createBrand = useCreateBrand();
   const updateBrand = useUpdateMasterData('brands');
+  const deleteBrand = useDeleteMasterData('brands');
   const importCsv = useImportMasterData('brands');
 
   return (
@@ -26,6 +28,7 @@ export default function BrandsPage() {
       ]}
       onCreate={(data) => createBrand.mutateAsync({ name: data.name })}
       onUpdate={(id, data) => updateBrand.mutateAsync({ id, data: { name: data.name } })}
+      onDelete={(id) => deleteBrand.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name']}
     />

@@ -3,6 +3,7 @@
 import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-page';
 import {
   useCreateProductType,
+  useDeleteMasterData,
   useImportMasterData,
   useProductTypes,
   useUpdateMasterData,
@@ -12,6 +13,7 @@ export default function ProductTypesPage() {
   const { data: types = [], isLoading } = useProductTypes();
   const createType = useCreateProductType();
   const updateType = useUpdateMasterData('product-types');
+  const deleteType = useDeleteMasterData('product-types');
   const importCsv = useImportMasterData('product-types');
 
   return (
@@ -26,6 +28,7 @@ export default function ProductTypesPage() {
       ]}
       onCreate={(data) => createType.mutateAsync({ name: data.name })}
       onUpdate={(id, data) => updateType.mutateAsync({ id, data: { name: data.name } })}
+      onDelete={(id) => deleteType.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name']}
     />

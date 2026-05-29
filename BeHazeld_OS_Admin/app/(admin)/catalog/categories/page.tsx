@@ -4,6 +4,7 @@ import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-pag
 import {
   useCategories,
   useCreateCategory,
+  useDeleteMasterData,
   useImportMasterData,
   useUpdateMasterData,
 } from '@/hooks/use-catalog';
@@ -13,6 +14,7 @@ export default function CategoriesPage() {
   const { data: categories = [], isLoading } = useCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateMasterData('categories');
+  const deleteCategory = useDeleteMasterData('categories');
   const importCsv = useImportMasterData('categories');
 
   return (
@@ -48,6 +50,7 @@ export default function CategoriesPage() {
           } as CreateCategoryPayload,
         })
       }
+      onDelete={(id) => deleteCategory.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name', 'description', 'sort_order']}
     />

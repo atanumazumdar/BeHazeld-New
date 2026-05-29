@@ -173,6 +173,42 @@ class CatalogService:
         self.db.refresh(obj)
         return obj
 
+    def archive_category(self, tenant_id: uuid.UUID, category_id: uuid.UUID) -> Category:
+        obj = self.repo.archive_category(tenant_id, category_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def archive_product_group(self, tenant_id: uuid.UUID, group_id: uuid.UUID) -> ProductGroup:
+        obj = self.repo.archive_product_group(tenant_id, group_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def archive_product_type(self, tenant_id: uuid.UUID, type_id: uuid.UUID) -> ProductType:
+        obj = self.repo.archive_product_type(tenant_id, type_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def archive_brand(self, tenant_id: uuid.UUID, brand_id: uuid.UUID) -> Brand:
+        obj = self.repo.archive_brand(tenant_id, brand_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def archive_size(self, tenant_id: uuid.UUID, size_id: uuid.UUID) -> Size:
+        obj = self.repo.archive_size(tenant_id, size_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def archive_color(self, tenant_id: uuid.UUID, color_id: uuid.UUID) -> Color:
+        obj = self.repo.archive_color(tenant_id, color_id)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
     def import_master_data_csv(
         self,
         tenant_id: uuid.UUID,

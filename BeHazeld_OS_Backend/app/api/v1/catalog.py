@@ -111,6 +111,15 @@ def update_category(
     return CatalogService(db).update_category(ctx.tenant_id, category_id, body)  # type: ignore[return-value]
 
 
+@router.delete("/categories/{category_id}", response_model=CategoryResponse)
+def archive_category(
+    category_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> CategoryResponse:
+    return CatalogService(db).archive_category(ctx.tenant_id, category_id)  # type: ignore[return-value]
+
+
 # ── master data — product groups ──────────────────────────────────────────────
 
 @router.get("/product-groups", response_model=list[ProductGroupResponse])
@@ -142,6 +151,15 @@ def update_product_group(
     db: Session = Depends(get_db),
 ) -> ProductGroupResponse:
     return CatalogService(db).update_product_group(ctx.tenant_id, group_id, body)  # type: ignore[return-value]
+
+
+@router.delete("/product-groups/{group_id}", response_model=ProductGroupResponse)
+def archive_product_group(
+    group_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> ProductGroupResponse:
+    return CatalogService(db).archive_product_group(ctx.tenant_id, group_id)  # type: ignore[return-value]
 
 
 # ── master data — product types ───────────────────────────────────────────────
@@ -177,6 +195,15 @@ def update_product_type(
     return CatalogService(db).update_product_type(ctx.tenant_id, type_id, body)  # type: ignore[return-value]
 
 
+@router.delete("/product-types/{type_id}", response_model=ProductTypeResponse)
+def archive_product_type(
+    type_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> ProductTypeResponse:
+    return CatalogService(db).archive_product_type(ctx.tenant_id, type_id)  # type: ignore[return-value]
+
+
 # ── master data — brands ──────────────────────────────────────────────────────
 
 @router.get("/brands", response_model=list[BrandResponse])
@@ -208,6 +235,15 @@ def update_brand(
     db: Session = Depends(get_db),
 ) -> BrandResponse:
     return CatalogService(db).update_brand(ctx.tenant_id, brand_id, body)  # type: ignore[return-value]
+
+
+@router.delete("/brands/{brand_id}", response_model=BrandResponse)
+def archive_brand(
+    brand_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> BrandResponse:
+    return CatalogService(db).archive_brand(ctx.tenant_id, brand_id)  # type: ignore[return-value]
 
 
 # ── master data — sizes ───────────────────────────────────────────────────────
@@ -243,6 +279,15 @@ def update_size(
     return CatalogService(db).update_size(ctx.tenant_id, size_id, body)  # type: ignore[return-value]
 
 
+@router.delete("/sizes/{size_id}", response_model=SizeResponse)
+def archive_size(
+    size_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> SizeResponse:
+    return CatalogService(db).archive_size(ctx.tenant_id, size_id)  # type: ignore[return-value]
+
+
 # ── master data — colors ──────────────────────────────────────────────────────
 
 @router.get("/colors", response_model=list[ColorResponse])
@@ -274,6 +319,15 @@ def update_color(
     db: Session = Depends(get_db),
 ) -> ColorResponse:
     return CatalogService(db).update_color(ctx.tenant_id, color_id, body)  # type: ignore[return-value]
+
+
+@router.delete("/colors/{color_id}", response_model=ColorResponse)
+def archive_color(
+    color_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("catalog.masters.create")),
+    db: Session = Depends(get_db),
+) -> ColorResponse:
+    return CatalogService(db).archive_color(ctx.tenant_id, color_id)  # type: ignore[return-value]
 
 
 # ── products ──────────────────────────────────────────────────────────────────

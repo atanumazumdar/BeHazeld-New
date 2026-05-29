@@ -4,6 +4,7 @@ import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-pag
 import {
   useColors,
   useCreateColor,
+  useDeleteMasterData,
   useImportMasterData,
   useUpdateMasterData,
 } from '@/hooks/use-catalog';
@@ -28,6 +29,7 @@ export default function ColorsPage() {
   const { data: colors = [], isLoading } = useColors();
   const createColor = useCreateColor();
   const updateColor = useUpdateMasterData('colors');
+  const deleteColor = useDeleteMasterData('colors');
   const importCsv = useImportMasterData('colors');
 
   return (
@@ -63,6 +65,7 @@ export default function ColorsPage() {
           } as CreateColorPayload,
         })
       }
+      onDelete={(id) => deleteColor.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name', 'hex_code']}
     />

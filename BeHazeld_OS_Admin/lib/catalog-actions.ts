@@ -234,6 +234,36 @@ export async function updateMasterDataAction(
   );
 }
 
+export async function deleteMasterDataAction(
+  entityType: MasterDataImportType,
+  id: string,
+): Promise<CatalogActionResult<MasterDataCreateResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`${MASTER_DATA_ENDPOINTS[entityType]}/${id}`, {
+      method: 'DELETE',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, `Failed to archive ${entityType}.`),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as MasterDataCreateResponse,
+  };
+}
+
 export async function importMasterDataAction(
   entityType: MasterDataImportType,
   formData: FormData,

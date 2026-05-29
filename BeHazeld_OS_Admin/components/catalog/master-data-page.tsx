@@ -75,6 +75,7 @@ interface MasterDataPageProps {
   onCreate: (data: any) => Promise<unknown>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onUpdate?: (id: string, data: any) => Promise<unknown>;
+  onDelete?: (id: string) => Promise<unknown>;
   onImportCsv?: (file: File) => Promise<MasterDataImportResponse>;
   csvColumns?: string[];
 }
@@ -90,6 +91,7 @@ export function MasterDataPage({
   formFields,
   onCreate,
   onUpdate,
+  onDelete,
   onImportCsv,
   csvColumns,
 }: MasterDataPageProps) {
@@ -154,6 +156,19 @@ export function MasterDataPage({
       setIsSubmitting(false);
     }
   });
+
+  const handleDelete = async (item: MasterItem) => {
+    if (!onDelete) return;
+    if (!confirm(`Archive "${item.name}"? It will be removed from this list.`)) return;
+
+    try {
+      await onDelete(item.id);
+      toast.success(`${singularTitle} archived successfully.`);
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : `Failed to archive ${title.toLowerCase()}.`;
+      toast.error(msg);
+    }
+  };
 
   async function handleCsvSelected(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -230,7 +245,7 @@ export function MasterDataPage({
                   {col.label}
                 </TableHead>
               ))}
-              {onUpdate && (
+              {(onUpdate || onDelete) && (
                 <TableHead className="text-stone-600 font-medium text-right">
                   Actions
                 </TableHead>
@@ -241,7 +256,7 @@ export function MasterDataPage({
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {[...columns, ...(onUpdate ? [{ key: '__actions__', label: 'Actions' }] : [])].map((col) => (
+                  {[...columns, ...((onUpdate || onDelete) ? [{ key: '__actions__', label: 'Actions' }] : [])].map((col) => (
                     <TableCell key={col.key}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -250,7 +265,7 @@ export function MasterDataPage({
               ))
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length + (onUpdate ? 1 : 0)} className="py-12 text-center text-stone-400">
+                <TableCell colSpan={columns.length + ((onUpdate || onDelete) ? 1 : 0)} className="py-12 text-center text-stone-400">
                   No {title.toLowerCase()} yet. Add the first one!
                 </TableCell>
               </TableRow>
@@ -262,17 +277,32 @@ export function MasterDataPage({
                       {col.render ? col.render(item) : String(item[col.key] ?? '—')}
                     </TableCell>
                   ))}
-                  {onUpdate && (
+                  {(onUpdate || onDelete) && (
                     <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-700 hover:bg-stone-100"
-                        onClick={() => openEditDialog(item)}
-                      >
-                        Edit
-                      </Button>
+                      <div className="flex justify-end gap-2">
+                        {onUpdate && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-slate-700 hover:bg-stone-100"
+                            onClick={() => openEditDialog(item)}
+                          >
+                            Edit
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDelete(item)}
+                          >
+                            Archive
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>

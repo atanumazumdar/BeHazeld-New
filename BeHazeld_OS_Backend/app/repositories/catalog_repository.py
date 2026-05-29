@@ -271,6 +271,54 @@ class CatalogRepository:
         self.db.flush()
         return obj
 
+    def archive_category(self, tenant_id: uuid.UUID, category_id: uuid.UUID) -> Category:
+        obj = self.db.scalar(select(Category).where(Category.tenant_id == tenant_id, Category.id == category_id))
+        if obj is None:
+            raise NotFoundError(f"Category {category_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
+    def archive_product_group(self, tenant_id: uuid.UUID, group_id: uuid.UUID) -> ProductGroup:
+        obj = self.get_product_group_by_id(tenant_id, group_id)
+        if obj is None:
+            raise NotFoundError(f"ProductGroup {group_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
+    def archive_product_type(self, tenant_id: uuid.UUID, type_id: uuid.UUID) -> ProductType:
+        obj = self.db.scalar(select(ProductType).where(ProductType.tenant_id == tenant_id, ProductType.id == type_id))
+        if obj is None:
+            raise NotFoundError(f"ProductType {type_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
+    def archive_brand(self, tenant_id: uuid.UUID, brand_id: uuid.UUID) -> Brand:
+        obj = self.db.scalar(select(Brand).where(Brand.tenant_id == tenant_id, Brand.id == brand_id))
+        if obj is None:
+            raise NotFoundError(f"Brand {brand_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
+    def archive_size(self, tenant_id: uuid.UUID, size_id: uuid.UUID) -> Size:
+        obj = self.get_size_by_id(tenant_id, size_id)
+        if obj is None:
+            raise NotFoundError(f"Size {size_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
+    def archive_color(self, tenant_id: uuid.UUID, color_id: uuid.UUID) -> Color:
+        obj = self.get_color_by_id(tenant_id, color_id)
+        if obj is None:
+            raise NotFoundError(f"Color {color_id} not found")
+        obj.is_active = False
+        self.db.flush()
+        return obj
+
     def get_size_by_id(self, tenant_id: uuid.UUID, size_id: uuid.UUID) -> Size | None:
         return self.db.scalar(
             select(Size).where(Size.tenant_id == tenant_id, Size.id == size_id)

@@ -13,6 +13,7 @@ import {
   createProductAction,
   createMasterDataAction,
   createVariantAction,
+  deleteMasterDataAction,
   deleteProductAction,
   importMasterDataAction,
   listProductsAction,
@@ -354,6 +355,17 @@ export function useUpdateMasterData(entityType: MasterDataImportType) {
     }) => {
       const result = await updateMasterDataAction(entityType, id, data);
       return requireActionData(result, `Failed to update ${entityType}.`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
+  });
+}
+
+export function useDeleteMasterData(entityType: MasterDataImportType) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const result = await deleteMasterDataAction(entityType, id);
+      return requireActionData(result, `Failed to archive ${entityType}.`);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
   });

@@ -4,6 +4,7 @@ import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-pag
 import {
   useSizes,
   useCreateSize,
+  useDeleteMasterData,
   useImportMasterData,
   useUpdateMasterData,
 } from '@/hooks/use-catalog';
@@ -13,6 +14,7 @@ export default function SizesPage() {
   const { data: sizes = [], isLoading } = useSizes();
   const createSize = useCreateSize();
   const updateSize = useUpdateMasterData('sizes');
+  const deleteSize = useDeleteMasterData('sizes');
   const importCsv = useImportMasterData('sizes');
 
   return (
@@ -44,6 +46,7 @@ export default function SizesPage() {
           } as CreateSizePayload,
         })
       }
+      onDelete={(id) => deleteSize.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name', 'sort_order']}
     />

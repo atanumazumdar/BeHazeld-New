@@ -3,6 +3,7 @@
 import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-page';
 import {
   useCreateProductGroup,
+  useDeleteMasterData,
   useImportMasterData,
   useProductGroups,
   useUpdateMasterData,
@@ -12,6 +13,7 @@ export default function ProductGroupsPage() {
   const { data: groups = [], isLoading } = useProductGroups();
   const createGroup = useCreateProductGroup();
   const updateGroup = useUpdateMasterData('product-groups');
+  const deleteGroup = useDeleteMasterData('product-groups');
   const importCsv = useImportMasterData('product-groups');
 
   return (
@@ -43,6 +45,7 @@ export default function ProductGroupsPage() {
           },
         })
       }
+      onDelete={(id) => deleteGroup.mutateAsync(id)}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name', 'description']}
     />
