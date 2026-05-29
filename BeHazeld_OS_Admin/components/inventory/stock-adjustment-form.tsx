@@ -57,6 +57,13 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 const MANUAL_MOVEMENT_TYPES = Object.keys(MOVEMENT_LABELS) as MovementType[];
 
+function normalizeUnitCost(value: string | null | undefined): string {
+  if (!value) return '0';
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+  return String(amount);
+}
+
 export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: StockAdjustmentFormProps) {
   const { data: locations = [] } = useLocations();
   const recordMovement = useRecordMovement();
@@ -64,6 +71,7 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const resolvedDefaultUnitCost = normalizeUnitCost(defaultUnitCost);
   const bins =
     locations.find((l) => l.id === selectedLocationId)?.bins.filter((b) => b.is_active) ?? [];
 
@@ -80,14 +88,17 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
       bin_id: '',
       movement_type: 'adjustment_in',
       quantity: '',
-      unit_cost: defaultUnitCost ?? '0',
+      unit_cost: resolvedDefaultUnitCost,
       notes: '',
     },
   });
 
   useEffect(() => {
-    setValue('unit_cost', defaultUnitCost ?? '0');
-  }, [defaultUnitCost, setValue]);
+    setValue('unit_cost', resolvedDefaultUnitCost, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [resolvedDefaultUnitCost, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -102,7 +113,14 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
         notes: values.notes || null,
       });
       toast.success('Stock movement recorded successfully.');
-      reset();
+      reset({
+        location_id: '',
+        bin_id: '',
+        movement_type: 'adjustment_in',
+        quantity: '',
+        unit_cost: resolvedDefaultUnitCost,
+        notes: '',
+      });
       setSelectedLocationId('');
       onSuccess?.();
     } catch (err) {
@@ -324,14 +342,23 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
         {/* Unit cost */}
         <div className="space-y-1.5">
           <Label>Unit Cost</Label>
-          <Input
-            {...register('unit_cost', { min: 0 })}
-            type="number"
-            step="0.01"
-            placeholder="0.00"
-            className="bg-white"
+          <Controller
+            name="unit_cost"
+            control={control}
+            rules={{ min: 0 }}
+            render={({ field }) => (
+              <Input
+                {...field}
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className="bg-white"
+              />
+            )}
           />
-          <p className="text-xs text-stone-400">Leave 0 for non-purchase adjustments.</p>
+          <p className="text-xs text-stone-400">
+            Auto-filled from variant cost price. Leave 0 for non-purchase adjustments.
+          </p>
         </div>
 
         {/* Notes */}
