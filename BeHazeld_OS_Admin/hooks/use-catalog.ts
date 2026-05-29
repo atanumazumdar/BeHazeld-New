@@ -18,6 +18,7 @@ import {
   listProductsAction,
   listMasterDataAction,
   uploadVariantImageAction,
+  updateVariantAction,
 } from '@/lib/catalog-actions';
 import type {
   BrandResponse,
@@ -36,6 +37,7 @@ import type {
   ProductTypeResponse,
   ProductVariantResponse,
   SizeResponse,
+  UpdateVariantPayload,
 } from '@/types/catalog';
 
 interface ActionResult<T> {
@@ -193,6 +195,26 @@ export function useCreateVariant(productId: string) {
     mutationFn: async (data: CreateVariantPayload) => {
       const result = await createVariantAction(productId, data);
       return requireActionData(result, 'Failed to create variant.') as ProductVariantResponse;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });
+      qc.invalidateQueries({ queryKey: catalogKeys.all });
+    },
+  });
+}
+
+export function useUpdateVariant(productId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      variantId,
+      data,
+    }: {
+      variantId: string;
+      data: UpdateVariantPayload;
+    }) => {
+      const result = await updateVariantAction(productId, variantId, data);
+      return requireActionData(result, 'Failed to update variant.') as ProductVariantResponse;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });

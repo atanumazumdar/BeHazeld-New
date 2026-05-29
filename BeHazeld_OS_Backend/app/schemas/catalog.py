@@ -79,6 +79,10 @@ class CreateVariantRequest(BaseModel):
     reorder_level: Annotated[int, Field(ge=0)] = 0
 
 
+class UpdateVariantRequest(CreateVariantRequest):
+    pass
+
+
 class MasterDataImportResponse(BaseModel):
     entity_type: str
     created: int

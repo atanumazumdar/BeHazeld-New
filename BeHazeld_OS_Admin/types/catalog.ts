@@ -97,6 +97,8 @@ export interface CreateVariantPayload {
   reorder_level: string;
 }
 
+export type UpdateVariantPayload = CreateVariantPayload;
+
 export interface CreateMasterPayload {
   name: string;
   description?: string | null;

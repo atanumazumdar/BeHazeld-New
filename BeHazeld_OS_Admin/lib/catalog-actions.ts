@@ -19,6 +19,7 @@ import type {
   ProductTypeResponse,
   ProductVariantResponse,
   SizeResponse,
+  UpdateVariantPayload,
 } from '@/types/catalog';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -257,11 +258,12 @@ async function authenticatedJsonRequest<T>(
   path: string,
   payload: unknown,
   fallback: string,
+  method = 'POST',
 ): Promise<CatalogActionResult<T>> {
   let response: Response;
   try {
     const result = await fetchWithAuth(path, {
-      method: 'POST',
+      method,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -374,6 +376,19 @@ export async function createVariantAction(
     `/api/v1/catalog/products/${productId}/variants`,
     payload,
     'Failed to create variant.',
+  );
+}
+
+export async function updateVariantAction(
+  productId: string,
+  variantId: string,
+  payload: UpdateVariantPayload,
+): Promise<CatalogActionResult<ProductVariantResponse>> {
+  return authenticatedJsonRequest<ProductVariantResponse>(
+    `/api/v1/catalog/products/${productId}/variants/${variantId}`,
+    payload,
+    'Failed to update variant.',
+    'PUT',
   );
 }
 

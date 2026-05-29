@@ -36,6 +36,7 @@ from app.schemas.catalog import (
     ProductTypeResponse,
     ProductVariantResponse,
     SizeResponse,
+    UpdateVariantRequest,
 )
 from app.services.catalog_service import CatalogService
 
@@ -333,6 +334,25 @@ def upload_variant_image(
         variant_id,
         image.file,
         filename=image.filename,
+    )  # type: ignore[return-value]
+
+
+@router.put(
+    "/products/{product_id}/variants/{variant_id}",
+    response_model=ProductVariantResponse,
+)
+def update_variant(
+    product_id: uuid.UUID,
+    variant_id: uuid.UUID,
+    body: UpdateVariantRequest,
+    ctx: TenantContext = Depends(require_permission("catalog.variants.create")),
+    db: Session = Depends(get_db),
+) -> ProductVariantResponse:
+    return CatalogService(db).update_variant(
+        ctx.tenant_id,
+        product_id,
+        variant_id,
+        body,
     )  # type: ignore[return-value]
 
 

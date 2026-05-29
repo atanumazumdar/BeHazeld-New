@@ -45,6 +45,7 @@ from app.schemas.catalog import (
     CreateSizeRequest,
     CreateVariantRequest,
     MasterDataImportResponse,
+    UpdateVariantRequest,
 )
 from app.services.image_service import ImageService
 
@@ -438,6 +439,45 @@ class CatalogService:
         self.db.commit()
         self.db.refresh(variant)
         return variant
+
+    def update_variant(
+        self,
+        tenant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        req: UpdateVariantRequest,
+    ) -> ProductVariant:
+        self._ensure_catalog_product_tables_available()
+        product = self.repo.get_product_by_id(tenant_id, product_id)
+        variant = self.repo.get_variant_by_id(tenant_id, variant_id)
+        if variant.product_id != product.id:
+            raise NotFoundError(f"ProductVariant {variant_id} not found for product {product_id}")
+
+        size = self.repo.get_size_by_id(tenant_id, req.size_id)
+        if size is None:
+            raise NotFoundError(f"Size {req.size_id} not found for this tenant")
+
+        color = self.repo.get_color_by_id(tenant_id, req.color_id)
+        if color is None:
+            raise NotFoundError(f"Color {req.color_id} not found for this tenant")
+
+        sku_code = generate_sku_code(product.product_code, size.name, color.name)
+        updated = self.repo.update_variant(
+            tenant_id=tenant_id,
+            variant_id=variant_id,
+            size_id=req.size_id,
+            color_id=req.color_id,
+            sku_code=sku_code,
+            mrp=req.mrp,
+            selling_price=req.selling_price,
+            cost_price=req.cost_price,
+            fabric=req.fabric,
+            image_url=req.image_url,
+            reorder_level=req.reorder_level,
+        )
+        self.db.commit()
+        self.db.refresh(updated)
+        return updated
 
     # ── reads (pass-through to repo) ─────────────────────────────────────────
 

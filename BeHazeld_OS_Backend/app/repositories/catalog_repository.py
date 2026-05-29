@@ -394,6 +394,38 @@ class CatalogRepository:
         self.db.flush()
         return variant
 
+    def update_variant(
+        self,
+        tenant_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        size_id: uuid.UUID,
+        color_id: uuid.UUID,
+        sku_code: str,
+        mrp: Decimal,
+        selling_price: Decimal,
+        cost_price: Decimal,
+        fabric: str | None = None,
+        image_url: str | None = None,
+        reorder_level: int = 0,
+    ) -> ProductVariant:
+        variant = self.get_variant_by_id(tenant_id, variant_id)
+        existing = self.get_variant_by_sku(tenant_id, sku_code)
+        if existing is not None and existing.id != variant.id:
+            raise ConflictError(f"ProductVariant with SKU '{sku_code}' already exists")
+
+        variant.size_id = size_id
+        variant.color_id = color_id
+        variant.sku_code = sku_code
+        variant.mrp = mrp
+        variant.selling_price = selling_price
+        variant.cost_price = cost_price
+        variant.fabric = fabric
+        if image_url is not None:
+            variant.image_url = image_url
+        variant.reorder_level = reorder_level
+        self.db.flush()
+        return variant
+
     def soft_delete_variant(
         self, tenant_id: uuid.UUID, variant_id: uuid.UUID
     ) -> ProductVariant:

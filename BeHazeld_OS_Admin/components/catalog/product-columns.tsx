@@ -17,6 +17,7 @@ interface ProductActionsProps {
   variantId: string | null;
   hasImage: boolean;
   onAddVariant: () => void;
+  onEditVariant: () => void;
   onDelete: (id: string) => void;
 }
 
@@ -41,6 +42,7 @@ export function ProductRowActions({
   variantId,
   hasImage,
   onAddVariant,
+  onEditVariant,
   onDelete,
 }: ProductActionsProps) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +71,16 @@ export function ProductRowActions({
         className="hidden"
         onChange={handlePhotoChange}
       />
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-slate-700 hover:bg-stone-100"
+        disabled={!variantId}
+        onClick={onEditVariant}
+      >
+        Edit
+      </Button>
       <Button
         type="button"
         variant="ghost"
