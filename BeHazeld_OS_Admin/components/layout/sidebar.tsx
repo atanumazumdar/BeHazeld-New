@@ -10,12 +10,15 @@ import {
   BookOpen,
   ShieldCheck,
   Settings,
+  LogOut,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { SidebarNavItem } from './sidebar-nav-item';
 import { cn } from '@/lib/utils';
+import { logoutAction } from '@/lib/auth-actions';
 
 const NAV_ITEMS = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -48,6 +51,10 @@ export function Sidebar() {
       localStorage.setItem(STORAGE_KEY, String(next));
       return next;
     });
+  }
+
+  function handleLogout() {
+    void logoutAction();
   }
 
   // Prevent flash of incorrect state during hydration
@@ -99,6 +106,33 @@ export function Sidebar() {
             label={SETTINGS_ITEM.label}
             collapsed={collapsed}
           />
+
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger render={<span />}>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="flex w-full items-center justify-center rounded-md px-2 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50"
+                  aria-label="Log out"
+                >
+                  <LogOut className="h-4 w-4 flex-shrink-0" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="font-medium">
+                Log out
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-50"
+            >
+              <LogOut className="h-4 w-4 flex-shrink-0" />
+              <span>Log out</span>
+            </button>
+          )}
 
           <button
             onClick={toggle}
