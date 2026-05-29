@@ -28,7 +28,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError, StockNotAvailableError, ValidationError
+from app.core.exceptions import NotFoundError, StockNotAvailableError
 from app.models.inventory import Bin, MovementType, StockBalance, StockBatch, StockLedger
 from app.models.tenant import Company, Location
 from app.repositories.catalog_repository import CatalogRepository
@@ -304,7 +304,13 @@ class InventoryService:
             .order_by(Company.name)
         )
         if company is None:
-            raise ValidationError("No active company found for this tenant")
+            company = Company(
+                tenant_id=tenant_id,
+                name="Default Company",
+                is_active=True,
+            )
+            self.db.add(company)
+            self.db.flush()
         return company
 
     def _location_map(self, tenant_id: uuid.UUID) -> dict[str, Location]:
