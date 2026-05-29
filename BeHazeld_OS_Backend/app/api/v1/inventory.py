@@ -94,6 +94,7 @@ def list_locations(
     db: Session = Depends(get_db),
 ) -> list[LocationResponse]:
     """List all active locations for the tenant, with their bins."""
+    InventoryService(db).ensure_inventory_tables_available()
     locations = TenantRepository(db).list_locations_by_tenant(ctx.tenant_id)
     inv_repo = InventoryRepository(db)
     result = []

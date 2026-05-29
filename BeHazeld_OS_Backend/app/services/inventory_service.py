@@ -25,10 +25,11 @@ import csv
 import io
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, StockNotAvailableError
+from app.db.base import Base
 from app.models.inventory import Bin, MovementType, StockBalance, StockBatch, StockLedger
 from app.models.tenant import Company, Location
 from app.repositories.catalog_repository import CatalogRepository
@@ -64,6 +65,7 @@ class InventoryService:
         location_id: uuid.UUID,
         req: CreateBinRequest,
     ) -> Bin:
+        self.ensure_inventory_tables_available()
         try:
             b = self.repo.create_bin(
                 tenant_id=tenant_id,
@@ -79,13 +81,35 @@ class InventoryService:
             raise
 
     def list_bins(self, tenant_id: uuid.UUID, location_id: uuid.UUID) -> list[Bin]:
+        self.ensure_inventory_tables_available()
         return self.repo.list_bins_by_location(tenant_id, location_id)
+
+    def ensure_inventory_tables_available(self) -> None:
+        """Create inventory schema tables on first-run production databases."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS inventory"))
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                Bin.__table__,
+                StockBatch.__table__,
+                StockLedger.__table__,
+                StockBalance.__table__,
+            ],
+        )
 
     def import_locations_bins_csv(
         self,
         tenant_id: uuid.UUID,
         content: bytes,
     ) -> InventoryLocationImportResponse:
+        self.ensure_inventory_tables_available()
         try:
             text = content.decode("utf-8-sig")
         except UnicodeDecodeError:
@@ -193,6 +217,7 @@ class InventoryService:
         In both error cases the transaction is rolled back and NO ledger entry
         is created.
         """
+        self.ensure_inventory_tables_available()
         try:
             movement_type = MovementType(req.movement_type)
             is_outward = movement_type in _OUTWARD_TYPES
@@ -279,6 +304,7 @@ class InventoryService:
         location_id: uuid.UUID,
         limit: int = 100,
     ) -> list[StockLedger]:
+        self.ensure_inventory_tables_available()
         return self.repo.get_ledger_entries(
             tenant_id, product_variant_id, location_id, limit=limit
         )
@@ -286,6 +312,7 @@ class InventoryService:
     def get_stock_summary(
         self, tenant_id: uuid.UUID, product_variant_id: uuid.UUID
     ) -> list[StockBalance]:
+        self.ensure_inventory_tables_available()
         return self.repo.get_stock_summary(tenant_id, product_variant_id)
 
     def get_balance(
@@ -295,6 +322,7 @@ class InventoryService:
         location_id: uuid.UUID,
         bin_id: uuid.UUID,
     ) -> StockBalance | None:
+        self.ensure_inventory_tables_available()
         return self.repo.get_balance(tenant_id, product_variant_id, location_id, bin_id)
 
     def _get_default_company(self, tenant_id: uuid.UUID) -> Company:
