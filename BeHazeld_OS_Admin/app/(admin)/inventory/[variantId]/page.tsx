@@ -156,6 +156,7 @@ export default function InventoryVariantPage({ params, searchParams }: PageProps
       <StockAdjustmentForm
         variantId={variantId}
         defaultUnitCost={defaultUnitCost}
+        onSuccess={setSelectedLocationId}
       />
 
       {/* ── Ledger ── */}

@@ -44,7 +44,7 @@ interface AdjustmentFormValues {
 interface StockAdjustmentFormProps {
   variantId: string;
   defaultUnitCost?: string | null;
-  onSuccess?: () => void;
+  onSuccess?: (locationId: string) => void;
 }
 
 const MOVEMENT_LABELS: Record<string, string> = {
@@ -113,6 +113,7 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
         notes: values.notes || null,
       });
       toast.success('Stock movement recorded successfully.');
+      onSuccess?.(values.location_id);
       reset({
         location_id: '',
         bin_id: '',
@@ -122,7 +123,6 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
         notes: '',
       });
       setSelectedLocationId('');
-      onSuccess?.();
     } catch (err) {
       if (err instanceof ApiError && err.errorCode === 'SALE_STOCK_NOT_AVAILABLE') {
         toast.error('Insufficient stock — there is not enough available quantity for this adjustment.', {
