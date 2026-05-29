@@ -15,6 +15,7 @@ import { apiClient } from '@/lib/api-client';
 import {
   importLocationsBinsAction,
   listLocationsAction,
+  recordMovementAction,
 } from '@/lib/inventory-actions';
 import type {
   InventoryLocationImportResponse,
@@ -110,8 +111,10 @@ export function useLedger(variantId: string, locationId: string, limit = 100) {
 export function useRecordMovement() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: RecordMovementPayload) =>
-      apiClient.post<StockMovementResponse>('/api/v1/inventory/movements', data),
+    mutationFn: async (data: RecordMovementPayload) => {
+      const result = await recordMovementAction(data);
+      return requireActionData(result, 'Failed to record stock movement.');
+    },
     onSuccess: (_data, variables) => {
       // Invalidate balance, summary, and ledger for the affected variant
       qc.invalidateQueries({

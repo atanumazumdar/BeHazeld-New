@@ -129,7 +129,9 @@ export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: S
           description: 'Check the current balance and reduce the quantity.',
         });
       } else {
-        const msg = err instanceof ApiError ? err.message : 'Failed to record stock movement.';
+        const msg = err instanceof ApiError || err instanceof Error
+          ? err.message
+          : 'Failed to record stock movement.';
         toast.error(msg);
       }
     }

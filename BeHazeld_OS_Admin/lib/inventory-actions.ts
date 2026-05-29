@@ -5,6 +5,8 @@ import { cookies } from 'next/headers';
 import type {
   InventoryLocationImportResponse,
   LocationResponse,
+  RecordMovementPayload,
+  StockMovementResponse,
 } from '@/types/inventory';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -160,5 +162,38 @@ export async function importLocationsBinsAction(
   return {
     success: true,
     data: (await response.json()) as InventoryLocationImportResponse,
+  };
+}
+
+export async function recordMovementAction(
+  payload: RecordMovementPayload,
+): Promise<InventoryActionResult<StockMovementResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth('/api/v1/inventory/movements', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to record stock movement.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as StockMovementResponse,
   };
 }
