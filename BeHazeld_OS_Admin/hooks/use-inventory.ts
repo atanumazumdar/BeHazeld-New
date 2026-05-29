@@ -12,6 +12,10 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import {
+  importLocationsBinsAction,
+  listLocationsAction,
+} from '@/lib/inventory-actions';
 import type {
   InventoryLocationImportResponse,
   LocationResponse,
@@ -19,6 +23,25 @@ import type {
   StockBalanceResponse,
   StockMovementResponse,
 } from '@/types/inventory';
+
+interface ActionResult<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+function requireActionData<T>(
+  result: ActionResult<T> | undefined,
+  fallbackMessage: string,
+): T {
+  if (!result) {
+    throw new Error('No response from the server. Please refresh and try again.');
+  }
+  if (!result.success || !result.data) {
+    throw new Error(result.message ?? fallbackMessage);
+  }
+  return result.data;
+}
 
 // ── Query keys ────────────────────────────────────────────────────────────────
 
@@ -38,7 +61,10 @@ export const inventoryKeys = {
 export function useLocations() {
   return useQuery({
     queryKey: inventoryKeys.locations(),
-    queryFn: () => apiClient.get<LocationResponse[]>('/api/v1/inventory/locations'),
+    queryFn: async () => {
+      const result = await listLocationsAction();
+      return requireActionData(result, 'Failed to load locations.');
+    },
   });
 }
 
@@ -111,13 +137,11 @@ export function useRecordMovement() {
 export function useImportLocationsBins() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File): Promise<InventoryLocationImportResponse> => {
       const form = new FormData();
       form.append('file', file);
-      return apiClient.postForm<InventoryLocationImportResponse>(
-        '/api/v1/inventory/import/locations-bins',
-        form,
-      );
+      const result = await importLocationsBinsAction(form);
+      return requireActionData(result, 'Failed to import locations/bins CSV.');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.locations() }),
   });
