@@ -11,7 +11,7 @@
  *  - "Preview PDF" and "Download PDF" actions
  */
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
@@ -39,11 +39,11 @@ const PAYMENT_MODE_LABELS: Record<string, string> = {
 };
 
 interface PageProps {
-  params: Promise<{ billId: string }>;
+  params: { billId: string };
 }
 
 export default function SaleDetailPage({ params }: PageProps) {
-  const { billId } = use(params);
+  const { billId } = params;
   const { data: bill, isLoading, error } = useBill(billId);
   const [showPreview, setShowPreview] = useState(false);
   const [downloading, setDownloading] = useState(false);

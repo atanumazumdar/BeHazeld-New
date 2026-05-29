@@ -11,7 +11,7 @@
  * Uses TanStack Query; queries auto-invalidate after a successful movement.
  */
 
-import { use, useState } from 'react';
+import { useState } from 'react';
 import { useStockSummary, useLedger, useLocations } from '@/hooks/use-inventory';
 import { StockAdjustmentForm } from '@/components/inventory/stock-adjustment-form';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -59,11 +59,11 @@ const MOVEMENT_LABELS: Record<string, string> = {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 interface PageProps {
-  params: Promise<{ variantId: string }>;
+  params: { variantId: string };
 }
 
 export default function InventoryVariantPage({ params }: PageProps) {
-  const { variantId } = use(params);
+  const { variantId } = params;
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
 
   const { data: locations = [] } = useLocations();
