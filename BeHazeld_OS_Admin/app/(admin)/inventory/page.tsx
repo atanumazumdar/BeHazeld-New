@@ -24,6 +24,36 @@ import {
 import { useDebounce } from 'use-debounce';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 
+function formatWholeAmount(value: string | null | undefined): string {
+  if (value === null || value === undefined || value === '') return '—';
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return value;
+
+  return amount.toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  });
+}
+
+function formatCurrencyAmount(value: string | null | undefined): string {
+  const amount = formatWholeAmount(value);
+  return amount === '—' ? amount : `₹${amount}`;
+}
+
+function formatMarginPercent(costPrice: string | null | undefined, sellingPrice: string | null | undefined): string {
+  const cost = Number(costPrice);
+  const sell = Number(sellingPrice);
+
+  if (!Number.isFinite(cost) || !Number.isFinite(sell) || sell <= 0) return '—';
+
+  const margin = ((sell - cost) / sell) * 100;
+  return `${margin.toLocaleString('en-IN', {
+    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+  })}%`;
+}
+
 export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 400);
@@ -56,6 +86,10 @@ export default function InventoryPage() {
               <TableHead className="text-stone-600 font-medium">Code</TableHead>
               <TableHead className="text-stone-600 font-medium">Product</TableHead>
               <TableHead className="text-stone-600 font-medium">Status</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">MRP</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Cost</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Sell</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Margin</TableHead>
               <TableHead className="text-stone-600 font-medium text-right">Variants</TableHead>
             </TableRow>
           </TableHeader>
@@ -63,14 +97,14 @@ export default function InventoryPage() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 4 }).map((_, j) => (
+                  {Array.from({ length: 8 }).map((_, j) => (
                     <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                   ))}
                 </TableRow>
               ))
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="py-12 text-center text-stone-400">
+                <TableCell colSpan={8} className="py-12 text-center text-stone-400">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -114,6 +148,18 @@ function ProductInventoryRow({
           </Badge>
         </TableCell>
         <TableCell className="text-right text-stone-400 text-sm">
+          —
+        </TableCell>
+        <TableCell className="text-right text-stone-400 text-sm">
+          —
+        </TableCell>
+        <TableCell className="text-right text-stone-400 text-sm">
+          —
+        </TableCell>
+        <TableCell className="text-right text-stone-400 text-sm">
+          —
+        </TableCell>
+        <TableCell className="text-right text-stone-400 text-sm">
           {`${variants.length} SKU${variants.length !== 1 ? 's' : ''}`}
         </TableCell>
       </TableRow>
@@ -138,8 +184,18 @@ function InventoryVariantRow({ variant }: { variant: ProductVariantResponse }) {
           {variant.sku_code}
         </Link>
       </TableCell>
-      <TableCell className="text-stone-500 text-sm">
-        MRP ₹{variant.mrp} · Sell ₹{variant.selling_price}
+      <TableCell />
+      <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+        {formatCurrencyAmount(variant.mrp)}
+      </TableCell>
+      <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+        {formatCurrencyAmount(variant.cost_price)}
+      </TableCell>
+      <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+        {formatCurrencyAmount(variant.selling_price)}
+      </TableCell>
+      <TableCell className="text-right text-stone-600 text-sm tabular-nums">
+        {formatMarginPercent(variant.cost_price, variant.selling_price)}
       </TableCell>
       <TableCell className="text-right">
         <Link
