@@ -195,7 +195,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
         <Table className="min-w-[1180px]">
           <TableHeader>
             <TableRow className="bg-stone-50 hover:bg-stone-50">
-              <TableHead className="w-40 min-w-40 text-stone-600 font-medium">Product Code</TableHead>
+              <TableHead className="w-44 min-w-44 text-stone-600 font-medium">Product Code</TableHead>
               <TableHead className="min-w-64 text-stone-600 font-medium">Name</TableHead>
               <TableHead className="w-32 text-stone-600 font-medium">Color</TableHead>
               <TableHead className="w-24 text-stone-600 font-medium">Size</TableHead>
@@ -227,7 +227,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
             ) : (
               rows.map(({ product, variant }) => (
                 <TableRow key={variant?.id ?? product.id} className="hover:bg-stone-50/60">
-                  <TableCell className="font-mono text-sm text-stone-700 whitespace-nowrap">
+                  <TableCell className="font-mono text-xs text-stone-700 whitespace-nowrap">
                     {product.product_code}
                   </TableCell>
                   <TableCell className="font-medium text-slate-800">{product.name}</TableCell>
