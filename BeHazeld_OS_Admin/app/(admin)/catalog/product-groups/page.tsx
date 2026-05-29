@@ -5,11 +5,13 @@ import {
   useCreateProductGroup,
   useImportMasterData,
   useProductGroups,
+  useUpdateMasterData,
 } from '@/hooks/use-catalog';
 
 export default function ProductGroupsPage() {
   const { data: groups = [], isLoading } = useProductGroups();
   const createGroup = useCreateProductGroup();
+  const updateGroup = useUpdateMasterData('product-groups');
   const importCsv = useImportMasterData('product-groups');
 
   return (
@@ -30,6 +32,15 @@ export default function ProductGroupsPage() {
         createGroup.mutateAsync({
           name: data.name,
           description: data.description || null,
+        })
+      }
+      onUpdate={(id, data) =>
+        updateGroup.mutateAsync({
+          id,
+          data: {
+            name: data.name,
+            description: data.description || null,
+          },
         })
       }
       onImportCsv={(file) => importCsv.mutateAsync(file)}

@@ -221,6 +221,19 @@ export async function createMasterDataAction(
   };
 }
 
+export async function updateMasterDataAction(
+  entityType: MasterDataImportType,
+  id: string,
+  payload: MasterDataCreatePayload,
+): Promise<CatalogActionResult<MasterDataCreateResponse>> {
+  return authenticatedJsonRequest<MasterDataCreateResponse>(
+    `${MASTER_DATA_ENDPOINTS[entityType]}/${id}`,
+    payload,
+    `Failed to update ${entityType}.`,
+    'PUT',
+  );
+}
+
 export async function importMasterDataAction(
   entityType: MasterDataImportType,
   formData: FormData,

@@ -1,12 +1,18 @@
 'use client';
 
 import { MasterDataPage, MasterItem } from '@/components/catalog/master-data-page';
-import { useSizes, useCreateSize, useImportMasterData } from '@/hooks/use-catalog';
+import {
+  useSizes,
+  useCreateSize,
+  useImportMasterData,
+  useUpdateMasterData,
+} from '@/hooks/use-catalog';
 import type { CreateSizePayload } from '@/types/catalog';
 
 export default function SizesPage() {
   const { data: sizes = [], isLoading } = useSizes();
   const createSize = useCreateSize();
+  const updateSize = useUpdateMasterData('sizes');
   const importCsv = useImportMasterData('sizes');
 
   return (
@@ -28,6 +34,15 @@ export default function SizesPage() {
           name: data.name,
           sort_order: Number(data.sort_order ?? 0),
         } as CreateSizePayload)
+      }
+      onUpdate={(id, data) =>
+        updateSize.mutateAsync({
+          id,
+          data: {
+            name: data.name,
+            sort_order: Number(data.sort_order ?? 0),
+          } as CreateSizePayload,
+        })
       }
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name', 'sort_order']}

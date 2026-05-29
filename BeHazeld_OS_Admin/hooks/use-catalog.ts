@@ -20,6 +20,7 @@ import {
   uploadVariantImageAction,
   updateProductAction,
   updateVariantAction,
+  updateMasterDataAction,
 } from '@/lib/catalog-actions';
 import type {
   BrandResponse,
@@ -338,6 +339,23 @@ export function useCreateColor() {
       return requireActionData(result, 'Failed to create color.') as ColorResponse;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.colors() }),
+  });
+}
+
+export function useUpdateMasterData(entityType: MasterDataImportType) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: CreateCategoryPayload | CreateMasterPayload | CreateSizePayload | CreateColorPayload;
+    }) => {
+      const result = await updateMasterDataAction(entityType, id, data);
+      return requireActionData(result, `Failed to update ${entityType}.`);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: catalogKeys.all }),
   });
 }
 

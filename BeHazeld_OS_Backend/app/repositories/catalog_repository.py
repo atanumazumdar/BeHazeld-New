@@ -199,6 +199,78 @@ class CatalogRepository:
         self.db.flush()
         return obj
 
+    def update_category(
+        self,
+        tenant_id: uuid.UUID,
+        category_id: uuid.UUID,
+        name: str,
+        description: str | None = None,
+        sort_order: int = 0,
+    ) -> Category:
+        obj = self.db.scalar(select(Category).where(Category.tenant_id == tenant_id, Category.id == category_id))
+        if obj is None:
+            raise NotFoundError(f"Category {category_id} not found")
+        obj.name = name
+        obj.description = description
+        obj.sort_order = sort_order
+        self.db.flush()
+        return obj
+
+    def update_product_group(
+        self,
+        tenant_id: uuid.UUID,
+        group_id: uuid.UUID,
+        name: str,
+        description: str | None = None,
+    ) -> ProductGroup:
+        obj = self.get_product_group_by_id(tenant_id, group_id)
+        if obj is None:
+            raise NotFoundError(f"ProductGroup {group_id} not found")
+        obj.name = name
+        obj.description = description
+        self.db.flush()
+        return obj
+
+    def update_product_type(
+        self, tenant_id: uuid.UUID, type_id: uuid.UUID, name: str
+    ) -> ProductType:
+        obj = self.db.scalar(select(ProductType).where(ProductType.tenant_id == tenant_id, ProductType.id == type_id))
+        if obj is None:
+            raise NotFoundError(f"ProductType {type_id} not found")
+        obj.name = name
+        self.db.flush()
+        return obj
+
+    def update_brand(self, tenant_id: uuid.UUID, brand_id: uuid.UUID, name: str) -> Brand:
+        obj = self.db.scalar(select(Brand).where(Brand.tenant_id == tenant_id, Brand.id == brand_id))
+        if obj is None:
+            raise NotFoundError(f"Brand {brand_id} not found")
+        obj.name = name
+        self.db.flush()
+        return obj
+
+    def update_size(
+        self, tenant_id: uuid.UUID, size_id: uuid.UUID, name: str, sort_order: int = 0
+    ) -> Size:
+        obj = self.get_size_by_id(tenant_id, size_id)
+        if obj is None:
+            raise NotFoundError(f"Size {size_id} not found")
+        obj.name = name
+        obj.sort_order = sort_order
+        self.db.flush()
+        return obj
+
+    def update_color(
+        self, tenant_id: uuid.UUID, color_id: uuid.UUID, name: str, hex_code: str | None = None
+    ) -> Color:
+        obj = self.get_color_by_id(tenant_id, color_id)
+        if obj is None:
+            raise NotFoundError(f"Color {color_id} not found")
+        obj.name = name
+        obj.hex_code = hex_code
+        self.db.flush()
+        return obj
+
     def get_size_by_id(self, tenant_id: uuid.UUID, size_id: uuid.UUID) -> Size | None:
         return self.db.scalar(
             select(Size).where(Size.tenant_id == tenant_id, Size.id == size_id)

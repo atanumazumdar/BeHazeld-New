@@ -5,11 +5,13 @@ import {
   useCreateProductType,
   useImportMasterData,
   useProductTypes,
+  useUpdateMasterData,
 } from '@/hooks/use-catalog';
 
 export default function ProductTypesPage() {
   const { data: types = [], isLoading } = useProductTypes();
   const createType = useCreateProductType();
+  const updateType = useUpdateMasterData('product-types');
   const importCsv = useImportMasterData('product-types');
 
   return (
@@ -23,6 +25,7 @@ export default function ProductTypesPage() {
         { key: 'name', label: 'Type Name', required: true, placeholder: 'e.g. Dress' },
       ]}
       onCreate={(data) => createType.mutateAsync({ name: data.name })}
+      onUpdate={(id, data) => updateType.mutateAsync({ id, data: { name: data.name } })}
       onImportCsv={(file) => importCsv.mutateAsync(file)}
       csvColumns={['name']}
     />

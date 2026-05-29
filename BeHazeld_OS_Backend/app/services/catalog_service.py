@@ -45,7 +45,13 @@ from app.schemas.catalog import (
     CreateSizeRequest,
     CreateVariantRequest,
     MasterDataImportResponse,
+    UpdateBrandRequest,
+    UpdateCategoryRequest,
+    UpdateColorRequest,
     UpdateProductRequest,
+    UpdateProductGroupRequest,
+    UpdateProductTypeRequest,
+    UpdateSizeRequest,
     UpdateVariantRequest,
 )
 from app.services.image_service import ImageService
@@ -115,6 +121,54 @@ class CatalogService:
         obj = self.repo.create_color(
             tenant_id=tenant_id, name=req.name, hex_code=req.hex_code
         )
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_category(
+        self, tenant_id: uuid.UUID, category_id: uuid.UUID, req: UpdateCategoryRequest
+    ) -> Category:
+        obj = self.repo.update_category(tenant_id, category_id, req.name, req.description, req.sort_order)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_product_group(
+        self, tenant_id: uuid.UUID, group_id: uuid.UUID, req: UpdateProductGroupRequest
+    ) -> ProductGroup:
+        obj = self.repo.update_product_group(tenant_id, group_id, req.name, req.description)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_product_type(
+        self, tenant_id: uuid.UUID, type_id: uuid.UUID, req: UpdateProductTypeRequest
+    ) -> ProductType:
+        obj = self.repo.update_product_type(tenant_id, type_id, req.name)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_brand(
+        self, tenant_id: uuid.UUID, brand_id: uuid.UUID, req: UpdateBrandRequest
+    ) -> Brand:
+        obj = self.repo.update_brand(tenant_id, brand_id, req.name)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_size(
+        self, tenant_id: uuid.UUID, size_id: uuid.UUID, req: UpdateSizeRequest
+    ) -> Size:
+        obj = self.repo.update_size(tenant_id, size_id, req.name, req.sort_order)
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
+    def update_color(
+        self, tenant_id: uuid.UUID, color_id: uuid.UUID, req: UpdateColorRequest
+    ) -> Color:
+        obj = self.repo.update_color(tenant_id, color_id, req.name, req.hex_code)
         self.db.commit()
         self.db.refresh(obj)
         return obj

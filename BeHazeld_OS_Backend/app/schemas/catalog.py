@@ -28,22 +28,42 @@ class CreateCategoryRequest(BaseModel):
     sort_order: Annotated[int, Field(ge=0)] = 0
 
 
+class UpdateCategoryRequest(CreateCategoryRequest):
+    pass
+
+
 class CreateProductGroupRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=150)]
     description: str | None = None
+
+
+class UpdateProductGroupRequest(CreateProductGroupRequest):
+    pass
 
 
 class CreateProductTypeRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=150)]
 
 
+class UpdateProductTypeRequest(CreateProductTypeRequest):
+    pass
+
+
 class CreateBrandRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=150)]
+
+
+class UpdateBrandRequest(CreateBrandRequest):
+    pass
 
 
 class CreateSizeRequest(BaseModel):
     name: Annotated[str, Field(min_length=1, max_length=50)]
     sort_order: Annotated[int, Field(ge=0)] = 0
+
+
+class UpdateSizeRequest(CreateSizeRequest):
+    pass
 
 
 class CreateColorRequest(BaseModel):
@@ -56,6 +76,10 @@ class CreateColorRequest(BaseModel):
         if v is not None and not re.match(r"^#[0-9A-Fa-f]{6}$", v):
             raise ValueError("hex_code must be in #RRGGBB format (e.g. '#FF5733')")
         return v
+
+
+class UpdateColorRequest(CreateColorRequest):
+    pass
 
 
 class CreateProductRequest(BaseModel):

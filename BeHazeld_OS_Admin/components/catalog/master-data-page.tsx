@@ -73,6 +73,8 @@ interface MasterDataPageProps {
   formFields: MasterFormField[];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onCreate: (data: any) => Promise<unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  onUpdate?: (id: string, data: any) => Promise<unknown>;
   onImportCsv?: (file: File) => Promise<MasterDataImportResponse>;
   csvColumns?: string[];
 }
@@ -87,10 +89,12 @@ export function MasterDataPage({
   columns,
   formFields,
   onCreate,
+  onUpdate,
   onImportCsv,
   csvColumns,
 }: MasterDataPageProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MasterItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -106,19 +110,45 @@ export function MasterDataPage({
     formState: { errors },
   } = useForm({ defaultValues });
 
+  const singularTitle = title.replace(/s$/, '');
+
+  const openCreateDialog = () => {
+    setEditingItem(null);
+    reset(defaultValues);
+    setDialogOpen(true);
+  };
+
+  const openEditDialog = (item: MasterItem) => {
+    setEditingItem(item);
+    reset({
+      ...defaultValues,
+      ...Object.fromEntries(
+        formFields.map((field) => [field.key, item[field.key] ?? field.defaultValue ?? '']),
+      ),
+    });
+    setDialogOpen(true);
+  };
+
   const handleClose = () => {
-    reset();
+    reset(defaultValues);
+    setEditingItem(null);
     setDialogOpen(false);
   };
 
   const onSubmit = handleSubmit(async (values) => {
     setIsSubmitting(true);
     try {
-      await onCreate(values);
-      toast.success(`${title.replace(/s$/, '')} created successfully.`);
+      if (editingItem && onUpdate) {
+        await onUpdate(editingItem.id, values);
+        toast.success(`${singularTitle} updated successfully.`);
+      } else {
+        await onCreate(values);
+        toast.success(`${singularTitle} created successfully.`);
+      }
       handleClose();
     } catch (err) {
-      const msg = err instanceof ApiError ? err.message : `Failed to create ${title.toLowerCase()}.`;
+      const action = editingItem ? 'update' : 'create';
+      const msg = err instanceof ApiError ? err.message : `Failed to ${action} ${title.toLowerCase()}.`;
       toast.error(msg);
     } finally {
       setIsSubmitting(false);
@@ -182,10 +212,10 @@ export function MasterDataPage({
             </>
           )}
           <Button
-            onClick={() => setDialogOpen(true)}
+            onClick={openCreateDialog}
             className="bg-slate-800 hover:bg-slate-700 text-white"
           >
-            + Add {title.replace(/s$/, '')}
+            + Add {singularTitle}
           </Button>
         </div>
       </div>
@@ -200,13 +230,18 @@ export function MasterDataPage({
                   {col.label}
                 </TableHead>
               ))}
+              {onUpdate && (
+                <TableHead className="text-stone-600 font-medium text-right">
+                  Actions
+                </TableHead>
+              )}
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <TableRow key={i}>
-                  {columns.map((col) => (
+                  {[...columns, ...(onUpdate ? [{ key: '__actions__', label: 'Actions' }] : [])].map((col) => (
                     <TableCell key={col.key}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -215,7 +250,7 @@ export function MasterDataPage({
               ))
             ) : items.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="py-12 text-center text-stone-400">
+                <TableCell colSpan={columns.length + (onUpdate ? 1 : 0)} className="py-12 text-center text-stone-400">
                   No {title.toLowerCase()} yet. Add the first one!
                 </TableCell>
               </TableRow>
@@ -227,6 +262,19 @@ export function MasterDataPage({
                       {col.render ? col.render(item) : String(item[col.key] ?? '—')}
                     </TableCell>
                   ))}
+                  {onUpdate && (
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-700 hover:bg-stone-100"
+                        onClick={() => openEditDialog(item)}
+                      >
+                        Edit
+                      </Button>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -239,7 +287,7 @@ export function MasterDataPage({
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="text-slate-800">
-              Add {title.replace(/s$/, '')}
+              {editingItem ? `Edit ${singularTitle}` : `Add ${singularTitle}`}
             </DialogTitle>
           </DialogHeader>
 
@@ -274,7 +322,7 @@ export function MasterDataPage({
                 disabled={isSubmitting}
                 className="bg-slate-800 hover:bg-slate-700 text-white"
               >
-                {isSubmitting ? 'Saving…' : 'Create'}
+                {isSubmitting ? 'Saving…' : editingItem ? 'Save Changes' : 'Create'}
               </Button>
             </DialogFooter>
           </form>
