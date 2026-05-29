@@ -13,6 +13,7 @@
 
 import { useState } from 'react';
 import { useStockSummary, useLedger, useLocations } from '@/hooks/use-inventory';
+import { useProducts } from '@/hooks/use-catalog';
 import { StockAdjustmentForm } from '@/components/inventory/stock-adjustment-form';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -67,6 +68,7 @@ export default function InventoryVariantPage({ params }: PageProps) {
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
 
   const { data: locations = [] } = useLocations();
+  const { data: products = [] } = useProducts({ limit: 500 });
   const { data: summary = [], isLoading: summaryLoading } = useStockSummary(variantId);
   const { data: ledger = [], isLoading: ledgerLoading } = useLedger(
     variantId,
@@ -77,13 +79,17 @@ export default function InventoryVariantPage({ params }: PageProps) {
     locations.find((l) => l.id === id)?.name ?? id.slice(0, 8);
   const binName = (locationId: string, binId: string) =>
     locations.find((l) => l.id === locationId)?.bins.find((b) => b.id === binId)?.name ?? binId.slice(0, 8);
+  const currentVariant = products
+    .flatMap((product) => product.variants ?? [])
+    .find((variant) => variant.id === variantId);
+  const skuLabel = currentVariant?.sku_code ?? variantId.slice(0, 8);
 
   return (
     <div className="space-y-8">
       {/* Page header */}
       <div>
         <p className="text-xs text-stone-400 font-mono mb-1">SKU</p>
-        <h1 className="text-2xl font-semibold text-slate-800 font-mono">{variantId}</h1>
+        <h1 className="text-2xl font-semibold text-slate-800 font-mono">{skuLabel}</h1>
         <p className="mt-1 text-sm text-stone-500">
           Stock balances and movement ledger for this variant.
         </p>
@@ -144,7 +150,10 @@ export default function InventoryVariantPage({ params }: PageProps) {
       </section>
 
       {/* ── Stock adjustment form ── */}
-      <StockAdjustmentForm variantId={variantId} />
+      <StockAdjustmentForm
+        variantId={variantId}
+        defaultUnitCost={currentVariant?.cost_price ?? null}
+      />
 
       {/* ── Ledger ── */}
       <section>
@@ -155,13 +164,14 @@ export default function InventoryVariantPage({ params }: PageProps) {
           <Select
             onValueChange={(val) => setSelectedLocationId(val ?? '')}
             value={selectedLocationId}
+            items={locations.map((l) => ({ value: l.id, label: l.name }))}
           >
             <SelectTrigger className="w-52 bg-white h-8 text-sm">
               <SelectValue placeholder="Filter by location…" />
             </SelectTrigger>
             <SelectContent>
               {locations.map((l) => (
-                <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                <SelectItem key={l.id} value={l.id} label={l.name}>{l.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>

@@ -11,7 +11,7 @@
  *   - On success → parent's onSuccess() is called so the ledger / balance refreshes
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'sonner';
 import { Download, Upload } from 'lucide-react';
@@ -42,6 +42,7 @@ interface AdjustmentFormValues {
 
 interface StockAdjustmentFormProps {
   variantId: string;
+  defaultUnitCost?: string | null;
   onSuccess?: () => void;
 }
 
@@ -55,7 +56,7 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 const MANUAL_MOVEMENT_TYPES = Object.keys(MOVEMENT_LABELS) as MovementType[];
 
-export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFormProps) {
+export function StockAdjustmentForm({ variantId, defaultUnitCost, onSuccess }: StockAdjustmentFormProps) {
   const { data: locations = [] } = useLocations();
   const recordMovement = useRecordMovement();
   const importLocationsBins = useImportLocationsBins();
@@ -71,16 +72,21 @@ export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFor
     control,
     reset,
     formState: { errors },
+    setValue,
   } = useForm<AdjustmentFormValues>({
     defaultValues: {
       location_id: '',
       bin_id: '',
       movement_type: 'adjustment_in',
       quantity: '',
-      unit_cost: '0',
+      unit_cost: defaultUnitCost ?? '0',
       notes: '',
     },
   });
+
+  useEffect(() => {
+    setValue('unit_cost', defaultUnitCost ?? '0');
+  }, [defaultUnitCost, setValue]);
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -194,15 +200,17 @@ export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFor
                   const v = val ?? '';
                   field.onChange(v);
                   setSelectedLocationId(v);
+                  setValue('bin_id', '');
                 }}
                 value={field.value}
+                items={locations.map((l) => ({ value: l.id, label: l.name }))}
               >
                 <SelectTrigger className={`bg-white ${errors.location_id ? 'border-red-400' : ''}`}>
                   <SelectValue placeholder="Select location…" />
                 </SelectTrigger>
                 <SelectContent>
                   {locations.map((l) => (
-                    <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
+                    <SelectItem key={l.id} value={l.id} label={l.name}>{l.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -222,13 +230,21 @@ export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFor
                 onValueChange={(val) => field.onChange(val ?? '')}
                 value={field.value}
                 disabled={!selectedLocationId}
+                items={bins.map((b) => ({
+                  value: b.id,
+                  label: `${b.name}${b.is_default ? ' (default)' : ''}`,
+                }))}
               >
                 <SelectTrigger className={`bg-white ${errors.bin_id ? 'border-red-400' : ''}`}>
                   <SelectValue placeholder={selectedLocationId ? 'Select bin…' : 'Choose location first'} />
                 </SelectTrigger>
                 <SelectContent>
                   {bins.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>
+                    <SelectItem
+                      key={b.id}
+                      value={b.id}
+                      label={`${b.name}${b.is_default ? ' (default)' : ''}`}
+                    >
                       {b.name}{b.is_default ? ' (default)' : ''}
                     </SelectItem>
                   ))}
@@ -249,13 +265,16 @@ export function StockAdjustmentForm({ variantId, onSuccess }: StockAdjustmentFor
               <Select
                 onValueChange={(val) => field.onChange((val ?? 'adjustment_in') as MovementType)}
                 value={field.value}
+                items={MANUAL_MOVEMENT_TYPES.map((mt) => ({ value: mt, label: MOVEMENT_LABELS[mt] }))}
               >
                 <SelectTrigger className="bg-white">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {MANUAL_MOVEMENT_TYPES.map((mt) => (
-                    <SelectItem key={mt} value={mt}>{MOVEMENT_LABELS[mt]}</SelectItem>
+                    <SelectItem key={mt} value={mt} label={MOVEMENT_LABELS[mt]}>
+                      {MOVEMENT_LABELS[mt]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
