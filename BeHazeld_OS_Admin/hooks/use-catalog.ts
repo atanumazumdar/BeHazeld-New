@@ -18,6 +18,7 @@ import {
   listProductsAction,
   listMasterDataAction,
   uploadVariantImageAction,
+  updateProductAction,
   updateVariantAction,
 } from '@/lib/catalog-actions';
 import type {
@@ -37,6 +38,7 @@ import type {
   ProductTypeResponse,
   ProductVariantResponse,
   SizeResponse,
+  UpdateProductPayload,
   UpdateVariantPayload,
 } from '@/types/catalog';
 
@@ -182,6 +184,25 @@ export function useCreateProduct() {
     mutationFn: async (data: CreateProductPayload) => {
       const result = await createProductAction(data);
       return requireActionData(result, 'Failed to create product.') as ProductResponse;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: catalogKeys.all });
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      productId,
+      data,
+    }: {
+      productId: string;
+      data: UpdateProductPayload;
+    }) => {
+      const result = await updateProductAction(productId, data);
+      return requireActionData(result, 'Failed to update product.') as ProductResponse;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: catalogKeys.all });

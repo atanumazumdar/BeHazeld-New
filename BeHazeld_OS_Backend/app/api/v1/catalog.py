@@ -36,6 +36,7 @@ from app.schemas.catalog import (
     ProductTypeResponse,
     ProductVariantResponse,
     SizeResponse,
+    UpdateProductRequest,
     UpdateVariantRequest,
 )
 from app.services.catalog_service import CatalogService
@@ -253,6 +254,16 @@ def get_product(
     db: Session = Depends(get_db),
 ) -> ProductResponse:
     return CatalogService(db).get_product(ctx.tenant_id, product_id)  # type: ignore[return-value]
+
+
+@router.put("/products/{product_id}", response_model=ProductResponse)
+def update_product(
+    product_id: uuid.UUID,
+    body: UpdateProductRequest,
+    ctx: TenantContext = Depends(require_permission("catalog.products.create")),
+    db: Session = Depends(get_db),
+) -> ProductResponse:
+    return CatalogService(db).update_product(ctx.tenant_id, product_id, body)  # type: ignore[return-value]
 
 
 @router.post(

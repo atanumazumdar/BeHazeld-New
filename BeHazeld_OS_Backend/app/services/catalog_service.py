@@ -45,6 +45,7 @@ from app.schemas.catalog import (
     CreateSizeRequest,
     CreateVariantRequest,
     MasterDataImportResponse,
+    UpdateProductRequest,
     UpdateVariantRequest,
 )
 from app.services.image_service import ImageService
@@ -368,6 +369,62 @@ class CatalogService:
             description=req.description,
             image_url=req.image_url,
         )
+        self.db.commit()
+        self.db.refresh(product)
+        return product
+
+    def update_product(
+        self, tenant_id: uuid.UUID, product_id: uuid.UUID, req: UpdateProductRequest
+    ) -> Product:
+        """
+        Update parent product details, then regenerate active variant SKUs if
+        the product-code initials changed.
+        """
+        self._ensure_catalog_product_tables_available()
+        existing_product = self.repo.get_product_by_id(tenant_id, product_id)
+        old_product_code = existing_product.product_code
+
+        if req.product_group_id is not None:
+            group = self.repo.get_product_group_by_id(tenant_id, req.product_group_id)
+            if group is None:
+                raise NotFoundError(
+                    f"ProductGroup {req.product_group_id} not found for this tenant"
+                )
+
+        new_product_code = generate_product_code("", req.name, 0)
+        product = self.repo.update_product(
+            tenant_id=tenant_id,
+            product_id=product_id,
+            product_code=new_product_code,
+            name=req.name,
+            category_id=req.category_id,
+            product_group_id=req.product_group_id,
+            product_type_id=req.product_type_id,
+            brand_id=req.brand_id,
+            description=req.description,
+            image_url=req.image_url,
+        )
+
+        if new_product_code != old_product_code:
+            for variant in self.repo.list_variants_by_product(tenant_id, product_id):
+                size = self.repo.get_size_by_id(tenant_id, variant.size_id)
+                color = self.repo.get_color_by_id(tenant_id, variant.color_id)
+                if size is None or color is None:
+                    continue
+                self.repo.update_variant(
+                    tenant_id=tenant_id,
+                    variant_id=variant.id,
+                    size_id=variant.size_id,
+                    color_id=variant.color_id,
+                    sku_code=generate_sku_code(new_product_code, size.name, color.name),
+                    mrp=variant.mrp,
+                    selling_price=variant.selling_price,
+                    cost_price=variant.cost_price,
+                    fabric=variant.fabric,
+                    image_url=variant.image_url,
+                    reorder_level=variant.reorder_level,
+                )
+
         self.db.commit()
         self.db.refresh(product)
         return product

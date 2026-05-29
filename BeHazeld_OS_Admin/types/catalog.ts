@@ -86,6 +86,8 @@ export interface CreateProductPayload {
   image_url: string | null;
 }
 
+export type UpdateProductPayload = CreateProductPayload;
+
 export interface CreateVariantPayload {
   size_id: string;
   color_id: string;

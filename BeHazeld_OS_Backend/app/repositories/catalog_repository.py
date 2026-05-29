@@ -307,6 +307,35 @@ class CatalogRepository:
         self.db.flush()
         return product
 
+    def update_product(
+        self,
+        tenant_id: uuid.UUID,
+        product_id: uuid.UUID,
+        product_code: str,
+        name: str,
+        category_id: uuid.UUID | None = None,
+        product_group_id: uuid.UUID | None = None,
+        product_type_id: uuid.UUID | None = None,
+        brand_id: uuid.UUID | None = None,
+        description: str | None = None,
+        image_url: str | None = None,
+    ) -> Product:
+        product = self.get_product_by_id(tenant_id, product_id)
+        existing = self.get_product_by_code(tenant_id, product_code)
+        if existing is not None and existing.id != product.id:
+            raise ConflictError(f"Product with code '{product_code}' already exists")
+
+        product.product_code = product_code
+        product.name = name
+        product.category_id = category_id
+        product.product_group_id = product_group_id
+        product.product_type_id = product_type_id
+        product.brand_id = brand_id
+        product.description = description
+        product.image_url = image_url
+        self.db.flush()
+        return product
+
     def soft_delete_product(self, tenant_id: uuid.UUID, product_id: uuid.UUID) -> Product:
         product = self.get_product_by_id(tenant_id, product_id)
         product.status = "deleted"

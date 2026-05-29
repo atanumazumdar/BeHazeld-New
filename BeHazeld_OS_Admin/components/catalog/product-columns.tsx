@@ -16,6 +16,7 @@ interface ProductActionsProps {
   productId: string;
   variantId: string | null;
   hasImage: boolean;
+  onEditProduct: () => void;
   onAddVariant: () => void;
   onEditVariant: () => void;
   onDelete: (id: string) => void;
@@ -41,6 +42,7 @@ export function ProductRowActions({
   productId,
   variantId,
   hasImage,
+  onEditProduct,
   onAddVariant,
   onEditVariant,
   onDelete,
@@ -76,10 +78,19 @@ export function ProductRowActions({
         variant="ghost"
         size="sm"
         className="text-slate-700 hover:bg-stone-100"
+        onClick={onEditProduct}
+      >
+        Edit Product
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="text-slate-700 hover:bg-stone-100"
         disabled={!variantId}
         onClick={onEditVariant}
       >
-        Edit
+        Edit Variant
       </Button>
       <Button
         type="button"

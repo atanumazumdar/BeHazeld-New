@@ -44,6 +44,7 @@ import {
 import { ApiError } from '@/types/api';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 import { AddVariantDialog } from './add-variant-dialog';
+import { EditProductDialog } from './edit-product-dialog';
 import { EditVariantDialog } from './edit-variant-dialog';
 
 const PAGE_SIZE = 20;
@@ -60,6 +61,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
   const [status, setStatus] = useState<string>('active');
   const [skip, setSkip] = useState(0);
   const [variantProduct, setVariantProduct] = useState<ProductResponse | null>(null);
+  const [editProduct, setEditProduct] = useState<ProductResponse | null>(null);
   const [editVariant, setEditVariant] = useState<{
     product: ProductResponse;
     variant: ProductVariantResponse;
@@ -248,6 +250,7 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
                       productId={product.id}
                       variantId={variant?.id ?? null}
                       hasImage={Boolean(variant?.image_url)}
+                      onEditProduct={() => setEditProduct(product)}
                       onAddVariant={() => setVariantProduct(product)}
                       onEditVariant={() => {
                         if (variant) setEditVariant({ product, variant });
@@ -292,6 +295,14 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
         open={Boolean(variantProduct)}
         onOpenChange={(open) => {
           if (!open) setVariantProduct(null);
+        }}
+      />
+
+      <EditProductDialog
+        product={editProduct}
+        open={Boolean(editProduct)}
+        onOpenChange={(open) => {
+          if (!open) setEditProduct(null);
         }}
       />
 

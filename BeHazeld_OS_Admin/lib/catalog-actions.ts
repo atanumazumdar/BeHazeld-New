@@ -19,6 +19,7 @@ import type {
   ProductTypeResponse,
   ProductVariantResponse,
   SizeResponse,
+  UpdateProductPayload,
   UpdateVariantPayload,
 } from '@/types/catalog';
 
@@ -336,6 +337,18 @@ export async function createProductAction(
     '/api/v1/catalog/products',
     payload,
     'Failed to create product.',
+  );
+}
+
+export async function updateProductAction(
+  productId: string,
+  payload: UpdateProductPayload,
+): Promise<CatalogActionResult<ProductResponse>> {
+  return authenticatedJsonRequest<ProductResponse>(
+    `/api/v1/catalog/products/${productId}`,
+    payload,
+    'Failed to update product.',
+    'PUT',
   );
 }
 

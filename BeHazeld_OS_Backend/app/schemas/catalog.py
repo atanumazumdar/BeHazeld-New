@@ -68,6 +68,10 @@ class CreateProductRequest(BaseModel):
     image_url: Annotated[str | None, Field(max_length=500)] = None
 
 
+class UpdateProductRequest(CreateProductRequest):
+    pass
+
+
 class CreateVariantRequest(BaseModel):
     size_id: uuid.UUID
     color_id: uuid.UUID
