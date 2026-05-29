@@ -173,12 +173,16 @@ function ProductInventoryRow({
 }
 
 function InventoryVariantRow({ variant }: { variant: ProductVariantResponse }) {
+  const variantHref = `/inventory/${variant.id}?sku=${encodeURIComponent(variant.sku_code)}${
+    variant.cost_price ? `&cost=${encodeURIComponent(variant.cost_price)}` : ''
+  }`;
+
   return (
     <TableRow className="hover:bg-blue-50/30">
       <TableCell />
       <TableCell>
         <Link
-          href={`/inventory/${variant.id}`}
+          href={variantHref}
           className="font-mono text-sm text-slate-700 hover:text-blue-600 hover:underline"
         >
           {variant.sku_code}
@@ -199,7 +203,7 @@ function InventoryVariantRow({ variant }: { variant: ProductVariantResponse }) {
       </TableCell>
       <TableCell className="text-right">
         <Link
-          href={`/inventory/${variant.id}`}
+          href={variantHref}
           className="text-xs text-blue-600 hover:underline"
         >
           View stock →

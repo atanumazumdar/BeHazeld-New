@@ -61,9 +61,13 @@ const MOVEMENT_LABELS: Record<string, string> = {
 
 interface PageProps {
   params: { variantId: string };
+  searchParams?: {
+    sku?: string;
+    cost?: string;
+  };
 }
 
-export default function InventoryVariantPage({ params }: PageProps) {
+export default function InventoryVariantPage({ params, searchParams }: PageProps) {
   const { variantId } = params;
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
 
@@ -82,7 +86,9 @@ export default function InventoryVariantPage({ params }: PageProps) {
   const currentVariant = products
     .flatMap((product) => product.variants ?? [])
     .find((variant) => variant.id === variantId);
-  const skuLabel = currentVariant?.sku_code ?? variantId.slice(0, 8);
+  const queryCost = searchParams?.cost && searchParams.cost !== 'null' ? searchParams.cost : null;
+  const skuLabel = currentVariant?.sku_code ?? searchParams?.sku ?? variantId.slice(0, 8);
+  const defaultUnitCost = currentVariant?.cost_price ?? queryCost;
 
   return (
     <div className="space-y-8">
@@ -152,7 +158,7 @@ export default function InventoryVariantPage({ params }: PageProps) {
       {/* ── Stock adjustment form ── */}
       <StockAdjustmentForm
         variantId={variantId}
-        defaultUnitCost={currentVariant?.cost_price ?? null}
+        defaultUnitCost={defaultUnitCost}
       />
 
       {/* ── Ledger ── */}
