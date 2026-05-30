@@ -11,7 +11,7 @@
  * Uses TanStack Query; queries auto-invalidate after a successful movement.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStockSummary, useLedger, useLocations } from '@/hooks/use-inventory';
 import { useVariant } from '@/hooks/use-catalog';
 import { StockAdjustmentForm } from '@/components/inventory/stock-adjustment-form';
@@ -86,6 +86,13 @@ export default function InventoryVariantPage({ params, searchParams }: PageProps
   const queryCost = searchParams?.cost && searchParams.cost !== 'null' ? searchParams.cost : null;
   const skuLabel = currentVariant?.sku_code ?? searchParams?.sku ?? variantId.slice(0, 8);
   const defaultUnitCost = currentVariant?.cost_price ?? queryCost;
+  const firstStockLocationId = summary[0]?.location_id ?? '';
+
+  useEffect(() => {
+    if (!selectedLocationId && firstStockLocationId) {
+      setSelectedLocationId(firstStockLocationId);
+    }
+  }, [firstStockLocationId, selectedLocationId]);
 
   return (
     <div className="space-y-8">

@@ -6,6 +6,7 @@ import type {
   InventoryLocationImportResponse,
   LocationResponse,
   RecordMovementPayload,
+  StockBalanceResponse,
   StockMovementResponse,
 } from '@/types/inventory';
 
@@ -195,5 +196,75 @@ export async function recordMovementAction(
   return {
     success: true,
     data: (await response.json()) as StockMovementResponse,
+  };
+}
+
+export async function getStockSummaryAction(
+  variantId: string,
+): Promise<InventoryActionResult<StockBalanceResponse[]>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/inventory/summary/${variantId}`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load stock summary.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as StockBalanceResponse[],
+  };
+}
+
+export async function getLedgerAction(
+  variantId: string,
+  locationId: string,
+  limit = 100,
+): Promise<InventoryActionResult<StockMovementResponse[]>> {
+  const params = new URLSearchParams({
+    location_id: locationId,
+    limit: String(limit),
+  });
+
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(
+      `/api/v1/inventory/ledger/${variantId}?${params.toString()}`,
+      {
+        method: 'GET',
+        cache: 'no-store',
+      },
+    );
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load movement ledger.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as StockMovementResponse[],
   };
 }

@@ -13,6 +13,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
+  getLedgerAction,
+  getStockSummaryAction,
   importLocationsBinsAction,
   listLocationsAction,
   recordMovementAction,
@@ -87,10 +89,10 @@ export function useStockBalance(
 export function useStockSummary(variantId: string) {
   return useQuery({
     queryKey: inventoryKeys.summary(variantId),
-    queryFn: () =>
-      apiClient.get<StockBalanceResponse[]>(
-        `/api/v1/inventory/summary/${variantId}`,
-      ),
+    queryFn: async () => {
+      const result = await getStockSummaryAction(variantId);
+      return requireActionData(result, 'Failed to load stock summary.');
+    },
     enabled: Boolean(variantId),
   });
 }
@@ -98,10 +100,10 @@ export function useStockSummary(variantId: string) {
 export function useLedger(variantId: string, locationId: string, limit = 100) {
   return useQuery({
     queryKey: inventoryKeys.ledger(variantId, locationId),
-    queryFn: () =>
-      apiClient.get<StockMovementResponse[]>(
-        `/api/v1/inventory/ledger/${variantId}?location_id=${locationId}&limit=${limit}`,
-      ),
+    queryFn: async () => {
+      const result = await getLedgerAction(variantId, locationId, limit);
+      return requireActionData(result, 'Failed to load movement ledger.');
+    },
     enabled: Boolean(variantId && locationId),
   });
 }
