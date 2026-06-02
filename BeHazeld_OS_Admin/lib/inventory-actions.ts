@@ -199,9 +199,7 @@ export async function recordMovementAction(
   };
 }
 
-export async function getStockSummaryAction(
-  variantId: string,
-): Promise<InventoryActionResult<StockBalanceResponse[]>> {
+async function getStockSummaryData(variantId: string): Promise<InventoryActionResult<StockBalanceResponse[]>> {
   let response: Response;
   try {
     const result = await fetchWithAuth(`/api/v1/inventory/summary/${variantId}`, {
@@ -229,7 +227,15 @@ export async function getStockSummaryAction(
   };
 }
 
-export async function listStockedVariantIdsAction(): Promise<InventoryActionResult<string[]>> {
+export async function getStockSummaryAction(
+  variantId: string,
+): Promise<InventoryActionResult<StockBalanceResponse[]>> {
+  return getStockSummaryData(variantId);
+}
+
+export async function listStockedVariantIdsAction(
+  variantIds: string[] = [],
+): Promise<InventoryActionResult<string[]>> {
   let response: Response;
   try {
     const result = await fetchWithAuth('/api/v1/inventory/stocked-variants', {
@@ -245,6 +251,10 @@ export async function listStockedVariantIdsAction(): Promise<InventoryActionResu
   }
 
   if (!response.ok) {
+    if (response.status === 404 && variantIds.length > 0) {
+      return listStockedVariantIdsFromSummaries(variantIds);
+    }
+
     return {
       success: false,
       message: await readErrorMessage(response, 'Failed to load recorded SKUs.'),
@@ -254,6 +264,31 @@ export async function listStockedVariantIdsAction(): Promise<InventoryActionResu
   return {
     success: true,
     data: (await response.json()) as string[],
+  };
+}
+
+async function listStockedVariantIdsFromSummaries(
+  variantIds: string[],
+): Promise<InventoryActionResult<string[]>> {
+  const uniqueVariantIds = Array.from(new Set(variantIds));
+  const stockedVariantIds: string[] = [];
+
+  for (const variantId of uniqueVariantIds) {
+    const result = await getStockSummaryData(variantId);
+    if (!result.success) {
+      return {
+        success: false,
+        message: result.message ?? 'Failed to load recorded SKUs.',
+      };
+    }
+    if ((result.data ?? []).length > 0) {
+      stockedVariantIds.push(variantId);
+    }
+  }
+
+  return {
+    success: true,
+    data: stockedVariantIds,
   };
 }
 

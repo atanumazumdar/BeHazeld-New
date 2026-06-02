@@ -64,7 +64,14 @@ export default function InventoryPage() {
     search: debouncedSearch || undefined,
     limit: 50,
   });
-  const { data: stockedVariantIds = [], isLoading: stockedLoading } = useStockedVariantIds();
+  const productVariantIds = products.flatMap((product) =>
+    (product.variants ?? []).map((variant) => variant.id),
+  );
+  const {
+    data: stockedVariantIds = [],
+    error: stockedError,
+    isLoading: stockedLoading,
+  } = useStockedVariantIds(productVariantIds);
   const stockedVariantIdSet = new Set(stockedVariantIds);
   const visibleProductRows = products
     .map((product) => {
@@ -115,6 +122,12 @@ export default function InventoryPage() {
       {!showRecorded && recordedSkuCount > 0 ? (
         <p className="text-sm text-stone-500">
           {recordedSkuCount} recorded SKU{recordedSkuCount !== 1 ? 's are' : ' is'} hidden from this opening-stock queue.
+        </p>
+      ) : null}
+
+      {stockedError ? (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Could not check which SKUs already have stock recorded. Please refresh after Railway finishes redeploying.
         </p>
       ) : null}
 

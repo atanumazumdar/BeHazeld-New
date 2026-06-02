@@ -73,11 +73,11 @@ export function useLocations() {
   });
 }
 
-export function useStockedVariantIds() {
+export function useStockedVariantIds(variantIds: string[] = []) {
   return useQuery({
-    queryKey: inventoryKeys.stockedVariants(),
+    queryKey: [...inventoryKeys.stockedVariants(), variantIds] as const,
     queryFn: async () => {
-      const result = await listStockedVariantIdsAction();
+      const result = await listStockedVariantIdsAction(variantIds);
       return requireActionData(result, 'Failed to load recorded SKUs.');
     },
   });
