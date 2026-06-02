@@ -58,6 +58,13 @@ class CreateSaleBillRequest(BaseModel):
     payment: CreateSalePaymentRequest
 
 
+class SalesInvoiceImportResponse(BaseModel):
+    imported: int
+    skipped: int
+    errors: list[str]
+    invoices: list[str]
+
+
 # ── Response schemas ──────────────────────────────────────────────────────────
 
 class CustomerResponse(BaseModel):

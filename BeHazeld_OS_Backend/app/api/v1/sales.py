@@ -12,7 +12,7 @@ import uuid
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session
 
@@ -24,6 +24,7 @@ from app.schemas.sales import (
     CustomerResponse,
     InvoiceMetadata,
     SaleBillResponse,
+    SalesInvoiceImportResponse,
 )
 from app.services.sales_service import SalesService
 
@@ -92,6 +93,28 @@ def create_sale(
         performed_by_user_id=ctx.user_id,
     )
     return bill  # type: ignore[return-value]
+
+
+@router.post(
+    "/bills/import",
+    response_model=SalesInvoiceImportResponse,
+)
+async def import_sale_bills(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("sales.bills.create")),
+    db: Session = Depends(get_db),
+) -> SalesInvoiceImportResponse:
+    is_csv_filename = bool(file.filename and file.filename.lower().endswith(".csv"))
+    is_csv_content = file.content_type in {"text/csv", "application/csv", "application/vnd.ms-excel"}
+    if not is_csv_filename and not is_csv_content:
+        from app.core.exceptions import ValidationError
+        raise ValidationError("Uploaded file must be a CSV")
+
+    return SalesService(db).import_invoice_csv(
+        tenant_id=ctx.tenant_id,
+        csv_bytes=await file.read(),
+        performed_by_user_id=ctx.user_id,
+    )
 
 
 @router.get("/bills/{bill_id}", response_model=SaleBillResponse)

@@ -7,8 +7,9 @@
  * Each row has: "View" → /sales/[billId], "Preview PDF", "Download PDF"
  */
 
-import { useState } from 'react';
+import { useMemo, useRef, useState, type ChangeEvent } from 'react';
 import Link from 'next/link';
+import { Download, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Input } from '@/components/ui/input';
@@ -26,12 +27,14 @@ import {
 } from '@/components/ui/table';
 import { InvoicePreviewModal } from '@/components/sales/invoice-preview-modal';
 
-import { useBills } from '@/hooks/use-sales';
+import { useBills, useImportSalesInvoices } from '@/hooks/use-sales';
 import { downloadInvoicePdf } from '@/hooks/use-sales';
+import { useProducts } from '@/hooks/use-catalog';
 
 const PAGE_SIZE = 20;
 
 export default function SalesHistoryPage() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [skip, setSkip] = useState(0);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -47,12 +50,64 @@ export default function SalesHistoryPage() {
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
   });
+  const { data: products = [] } = useProducts({ status: 'active', limit: 500 });
+  const importSales = useImportSalesInvoices();
+
+  const variantLookup = useMemo(() => {
+    const lookup = new Map<string, { skuCode: string; productCode: string; productName: string }>();
+    products.forEach((product) => {
+      (product.variants ?? []).forEach((variant) => {
+        lookup.set(variant.id, {
+          skuCode: variant.sku_code,
+          productCode: product.product_code,
+          productName: product.name,
+        });
+      });
+    });
+    return lookup;
+  }, [products]);
 
   const handleDownload = async (billId: string) => {
     setDownloading(billId);
     const ok = await downloadInvoicePdf(billId);
     setDownloading(null);
     if (!ok) toast.error('Failed to download PDF.');
+  };
+
+  const downloadTemplate = () => {
+    const csv = [
+      'invoice_number,bill_date,customer_name,sku_code,quantity,selling_price,payment_mode,tax_rate,discount_amount,notes',
+      '001,2026-01-19,Sumaiya Khan,AE-TCS-0-GLDN,1,4000,cash,0,0,Imported from invoice-001.pdf',
+    ].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sales_invoice_import_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const result = await importSales.mutateAsync(file);
+      const base = `Sales imported: ${result.imported} imported, ${result.skipped} skipped.`;
+      if (result.errors.length > 0) {
+        toast.warning(`${base} ${result.errors.slice(0, 3).join(' ')}`);
+      } else {
+        toast.success(base);
+      }
+      setSkip(0);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to import sales invoices.';
+      toast.error(message);
+    }
   };
 
   const loading = isLoading || isFetching;
@@ -67,12 +122,35 @@ export default function SalesHistoryPage() {
             All confirmed sale invoices for your account.
           </p>
         </div>
-        <Link
-          href="/sales/new"
-          className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-slate-800 hover:bg-slate-700 text-white transition-colors"
-        >
-          + New Sale
-        </Link>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleImportFile}
+          />
+          <Button type="button" variant="outline" className="gap-2" onClick={downloadTemplate}>
+            <Download className="h-4 w-4" />
+            CSV Template
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={importSales.isPending}
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload className="h-4 w-4" />
+            {importSales.isPending ? 'Importing...' : 'Import CSV'}
+          </Button>
+          <Link
+            href="/sales/new"
+            className="inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+          >
+            + New Sale
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
@@ -158,7 +236,23 @@ export default function SalesHistoryPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-stone-600 text-sm">
-                    {bill.lines.length} item{bill.lines.length !== 1 ? 's' : ''}
+                    <div className="space-y-1">
+                      {bill.lines.map((line) => {
+                        const variant = variantLookup.get(line.product_variant_id);
+                        return (
+                          <div key={line.id} className="leading-tight">
+                            <span className="font-mono text-xs text-slate-700">
+                              {variant?.skuCode ?? line.product_variant_id}
+                            </span>
+                            {variant ? (
+                              <span className="ml-2 text-xs text-stone-500">
+                                {variant.productCode} · {parseFloat(line.quantity).toFixed(0)} sold
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Badge className={

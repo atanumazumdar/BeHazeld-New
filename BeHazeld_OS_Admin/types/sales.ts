@@ -2,7 +2,7 @@
  * Sales domain types — mirrors FastAPI Pydantic schemas.
  */
 
-export type SalePaymentMode = 'cash' | 'bank_transfer' | 'cheque' | 'upi';
+export type SalePaymentMode = 'cash' | 'bank_transfer' | 'cheque' | 'upi' | 'card' | 'other';
 
 export interface CustomerResponse {
   id: string;
@@ -54,6 +54,13 @@ export interface SaleBillResponse {
   notes: string | null;
   lines: SaleBillLineResponse[];
   payments: SalePaymentResponse[];
+}
+
+export interface SalesInvoiceImportResponse {
+  imported: number;
+  skipped: number;
+  errors: string[];
+  invoices: string[];
 }
 
 // ── Request payloads ──────────────────────────────────────────────────────────

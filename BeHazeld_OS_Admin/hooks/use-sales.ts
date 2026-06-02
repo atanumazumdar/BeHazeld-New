@@ -17,6 +17,7 @@ import type {
   CreateSaleBillPayload,
   CustomerResponse,
   SaleBillResponse,
+  SalesInvoiceImportResponse,
 } from '@/types/sales';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -96,6 +97,20 @@ export function useCreateSale() {
   return useMutation({
     mutationFn: (data: CreateSaleBillPayload) =>
       apiClient.post<SaleBillResponse>('/api/v1/sales/bills', data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: salesKeys.all });
+    },
+  });
+}
+
+export function useImportSalesInvoices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file);
+      return apiClient.postForm<SalesInvoiceImportResponse>('/api/v1/sales/bills/import', form);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.all });
     },

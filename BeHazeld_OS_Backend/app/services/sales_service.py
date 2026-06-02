@@ -49,25 +49,33 @@ Atomicity guarantees
   is deducted and no bill is created.
 * Payment Failure — if Phase 3c raises, rollback fires, stock reverts.
 """
+import csv
+import io
 import uuid
 from datetime import date
 from decimal import Decimal
 from typing import Optional
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError, StockNotAvailableError
-from app.models.inventory import MovementType
+from app.core.exceptions import NotFoundError, StockNotAvailableError, ValidationError
+from app.models.inventory import Bin, MovementType
 from app.models.sales import Customer, SaleBill, SalePayment
+from app.models.tenant import Location
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.inventory_repository import InventoryRepository
 from app.repositories.sales_repository import SalesRepository, generate_invoice_number
 from app.schemas.sales import (
     CreateCustomerRequest,
     CreateSaleBillRequest,
+    CreateSaleBillLineRequest,
+    CreateSalePaymentRequest,
     InvoiceMetadata,
     SaleBillResponse,
+    SalesInvoiceImportResponse,
 )
+from app.services.inventory_service import InventoryService
 from app.services import report_service
 
 
@@ -115,6 +123,7 @@ class SalesService:
         req: CreateSaleBillRequest,
         tenant_name: str = "BeHazeld",
         performed_by_user_id: uuid.UUID | None = None,
+        invoice_number_override: str | None = None,
     ) -> tuple[SaleBill, InvoiceMetadata]:
         """
         Execute the atomic sale transaction.
@@ -180,8 +189,13 @@ class SalesService:
                 total_discount += line_disc
 
             # ── Phase 2b: generate invoice number ─────────────────────────────
-            seq = self.repo.count_bills_by_tenant(tenant_id) + 1
-            invoice_number = generate_invoice_number(seq)
+            if invoice_number_override:
+                invoice_number = invoice_number_override.strip()
+                if self.repo.get_bill_by_invoice_number(tenant_id, invoice_number) is not None:
+                    raise ValidationError(f"Invoice '{invoice_number}' already exists")
+            else:
+                seq = self.repo.count_bills_by_tenant(tenant_id) + 1
+                invoice_number = generate_invoice_number(seq)
 
             # ── Phase 2c: generate PDF bytes (CPU-only) ───────────────────────
             # Build a lightweight bill proxy for the PDF renderer — we don't
@@ -281,6 +295,217 @@ class SalesService:
         # ── Phase 4: save PDF to disk (post-commit; safe to retry) ───────────
         metadata = report_service.save_invoice_pdf(pdf_bytes, tenant_id, invoice_number)
         return bill, metadata
+
+    # ── Sales CSV import ─────────────────────────────────────────────────────
+
+    def import_invoice_csv(
+        self,
+        tenant_id: uuid.UUID,
+        csv_bytes: bytes,
+        performed_by_user_id: uuid.UUID | None = None,
+    ) -> SalesInvoiceImportResponse:
+        """
+        Import sale invoices from CSV.
+
+        Required columns:
+        invoice_number,bill_date,customer_name,sku_code,quantity,selling_price
+
+        Optional columns:
+        payment_mode,tax_rate,discount_amount,notes,transaction_id
+        """
+        InventoryService(self.db).ensure_inventory_tables_available()
+        location, bin_obj = self._default_sale_location_bin(tenant_id)
+
+        try:
+            text = csv_bytes.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValidationError("CSV must be UTF-8 encoded") from exc
+
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            raise ValidationError("CSV file is empty")
+
+        normalised_headers = {self._norm_header(h): h for h in reader.fieldnames}
+        required = {"invoice_number", "bill_date", "customer_name", "sku_code", "quantity", "selling_price"}
+        missing = sorted(required - set(normalised_headers))
+        if missing:
+            raise ValidationError(f"Missing required CSV columns: {', '.join(missing)}")
+
+        grouped: dict[str, list[dict[str, str]]] = {}
+        row_numbers: dict[str, list[int]] = {}
+        for index, raw_row in enumerate(reader, start=2):
+            row = {self._norm_header(k): (v or "").strip() for k, v in raw_row.items() if k is not None}
+            invoice_number = row.get("invoice_number", "")
+            if not invoice_number:
+                grouped.setdefault("", []).append(row)
+                row_numbers.setdefault("", []).append(index)
+                continue
+            grouped.setdefault(invoice_number, []).append(row)
+            row_numbers.setdefault(invoice_number, []).append(index)
+
+        imported = 0
+        skipped = 0
+        errors: list[str] = []
+        invoices: list[str] = []
+
+        for invoice_number, rows in grouped.items():
+            label = invoice_number or f"row {row_numbers.get(invoice_number, ['?'])[0]}"
+            if not invoice_number:
+                skipped += 1
+                errors.append(f"{label}: invoice_number is required")
+                continue
+            if self.repo.get_bill_by_invoice_number(tenant_id, invoice_number) is not None:
+                skipped += 1
+                invoices.append(invoice_number)
+                continue
+
+            try:
+                bill_date = self._parse_date(rows[0].get("bill_date", ""))
+                customer_id = self._customer_id_for_import(tenant_id, rows[0].get("customer_name", ""))
+                lines: list[CreateSaleBillLineRequest] = []
+                total_amount = Decimal("0")
+
+                for row in rows:
+                    sku_code = row.get("sku_code", "")
+                    variant = self.catalog_repo.get_variant_by_sku(tenant_id, sku_code)
+                    if variant is None:
+                        raise ValidationError(f"SKU '{sku_code}' not found")
+
+                    quantity = self._parse_decimal(row.get("quantity", ""), "quantity")
+                    selling_price = self._parse_decimal(row.get("selling_price", ""), "selling_price")
+                    tax_rate = self._parse_decimal(row.get("tax_rate", "0"), "tax_rate")
+                    discount_amount = self._parse_decimal(row.get("discount_amount", "0"), "discount_amount")
+                    net_price = selling_price - discount_amount
+                    line_total = (quantity * net_price * (Decimal("1") + tax_rate)).quantize(Decimal("0.01"))
+                    total_amount += line_total
+
+                    lines.append(
+                        CreateSaleBillLineRequest(
+                            product_variant_id=variant.id,
+                            quantity=quantity,
+                            selling_price=selling_price,
+                            tax_rate=tax_rate,
+                            discount_amount=discount_amount,
+                        )
+                    )
+
+                first_row = rows[0]
+                payment_mode = first_row.get("payment_mode", "cash") or "cash"
+                req = CreateSaleBillRequest(
+                    location_id=location.id,
+                    bin_id=bin_obj.id,
+                    bill_date=bill_date,
+                    customer_id=customer_id,
+                    notes=first_row.get("notes") or f"Imported sales invoice {invoice_number}",
+                    lines=lines,
+                    payment=CreateSalePaymentRequest(
+                        amount=total_amount,
+                        payment_mode=payment_mode,
+                        transaction_id=first_row.get("transaction_id") or None,
+                        notes=f"Imported payment for invoice {invoice_number}",
+                    ),
+                )
+                self.create_sale(
+                    tenant_id=tenant_id,
+                    req=req,
+                    performed_by_user_id=performed_by_user_id,
+                    invoice_number_override=invoice_number,
+                )
+                imported += 1
+                invoices.append(invoice_number)
+            except Exception as exc:
+                skipped += 1
+                self.db.rollback()
+                errors.append(f"{label}: {getattr(exc, 'message', str(exc))}")
+
+        return SalesInvoiceImportResponse(
+            imported=imported,
+            skipped=skipped,
+            errors=errors,
+            invoices=invoices,
+        )
+
+    def _default_sale_location_bin(self, tenant_id: uuid.UUID) -> tuple[Location, Bin]:
+        location = self.db.scalar(
+            select(Location)
+            .where(Location.tenant_id == tenant_id, Location.is_active.is_(True))
+            .order_by(Location.name)
+        )
+        if location is None:
+            raise ValidationError("No active location found. Import locations/bins before importing sales.")
+
+        bin_obj = self.db.scalar(
+            select(Bin)
+            .where(
+                Bin.tenant_id == tenant_id,
+                Bin.location_id == location.id,
+                Bin.is_active.is_(True),
+                Bin.is_default.is_(True),
+            )
+            .order_by(Bin.name)
+        )
+        if bin_obj is None:
+            bin_obj = self.db.scalar(
+                select(Bin)
+                .where(
+                    Bin.tenant_id == tenant_id,
+                    Bin.location_id == location.id,
+                    Bin.is_active.is_(True),
+                )
+                .order_by(Bin.name)
+            )
+        if bin_obj is None:
+            bin_obj = self.inv_repo.create_bin(tenant_id, location.id, "Main", is_default=True)
+        return location, bin_obj
+
+    def _customer_id_for_import(self, tenant_id: uuid.UUID, customer_name: str) -> uuid.UUID | None:
+        name = customer_name.strip()
+        if not name:
+            return None
+        existing = [
+            customer for customer in self.repo.list_customers(tenant_id, search=name)
+            if customer.name.strip().casefold() == name.casefold()
+        ]
+        if existing:
+            return existing[0].id
+        customer = self.repo.create_customer(tenant_id=tenant_id, name=name)
+        return customer.id
+
+    @staticmethod
+    def _norm_header(value: str | None) -> str:
+        return (value or "").strip().lower().replace(" ", "_")
+
+    @staticmethod
+    def _parse_decimal(value: str, field_name: str) -> Decimal:
+        cleaned = value.strip().replace("Rs.", "").replace("₹", "").replace(",", "")
+        if not cleaned:
+            cleaned = "0"
+        try:
+            parsed = Decimal(cleaned)
+        except Exception as exc:
+            raise ValidationError(f"{field_name} must be a number") from exc
+        if field_name in {"quantity", "selling_price"} and parsed <= 0:
+            raise ValidationError(f"{field_name} must be greater than 0")
+        if field_name in {"tax_rate", "discount_amount"} and parsed < 0:
+            raise ValidationError(f"{field_name} cannot be negative")
+        return parsed
+
+    @staticmethod
+    def _parse_date(value: str) -> date:
+        raw = value.strip()
+        if not raw:
+            raise ValidationError("bill_date is required")
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            pass
+        for fmt in ("%d/%m/%y", "%d/%m/%Y", "%m/%d/%y", "%m/%d/%Y"):
+            try:
+                from datetime import datetime
+                return datetime.strptime(raw, fmt).date()
+            except ValueError:
+                continue
+        raise ValidationError(f"Invalid bill_date '{value}'. Use YYYY-MM-DD.")
 
     # ── Bill reads ────────────────────────────────────────────────────────────
 
