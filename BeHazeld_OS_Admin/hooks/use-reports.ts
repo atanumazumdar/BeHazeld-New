@@ -17,6 +17,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
+  createJournalEntryAction,
   getProfitAndLossAction,
   getTrialBalanceAction,
   importAccountCodesAction,
@@ -26,6 +27,7 @@ import {
 } from '@/lib/finance-actions';
 import type {
   AuditLogEntry,
+  CreateJournalEntryPayload,
   DashboardMetrics,
   FinanceAccountResponse,
   FinanceImportResponse,
@@ -178,6 +180,24 @@ export function useImportJournalEntries() {
       qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
       qc.invalidateQueries({ queryKey: reportKeys.pl() });
       qc.refetchQueries({ queryKey: reportKeys.journals });
+    },
+  });
+}
+
+export function useCreateJournalEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (payload: CreateJournalEntryPayload): Promise<JournalEntryResponse> => {
+      const result = await createJournalEntryAction(payload);
+      return requireActionData(result, 'Failed to post journal entry.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.journals });
+      qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
+      qc.invalidateQueries({ queryKey: reportKeys.pl() });
+      qc.refetchQueries({ queryKey: reportKeys.journals });
+      qc.refetchQueries({ queryKey: reportKeys.trialBalance });
+      qc.refetchQueries({ queryKey: reportKeys.pl() });
     },
   });
 }

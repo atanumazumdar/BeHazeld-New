@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 
 import type {
+  CreateJournalEntryPayload,
   FinanceAccountResponse,
   FinanceImportResponse,
   JournalEntryResponse,
@@ -206,4 +207,37 @@ export async function getProfitAndLossAction(
     `/api/v1/finance/reports/profit-and-loss${qs ? `?${qs}` : ''}`,
     'Failed to load profit and loss.',
   );
+}
+
+export async function createJournalEntryAction(
+  payload: CreateJournalEntryPayload,
+): Promise<FinanceActionResult<JournalEntryResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth('/api/v1/finance/journals', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to post journal entry.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as JournalEntryResponse,
+  };
 }

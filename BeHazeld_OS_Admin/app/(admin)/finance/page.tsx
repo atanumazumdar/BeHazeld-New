@@ -31,6 +31,7 @@ import {
 import {
   useTrialBalance,
   useProfitAndLoss,
+  useCreateJournalEntry,
   useFinanceAccounts,
   useJournalEntries,
   useImportAccountCodes,
@@ -38,6 +39,7 @@ import {
   downloadTrialBalanceCsv,
   downloadProfitLossCsv,
 } from '@/hooks/use-reports';
+import type { CreateJournalLinePayload } from '@/types/reports';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,15 @@ function moneyClass(value: string): string {
   const n = parseFloat(value);
   if (isNaN(n) || n === 0) return 'text-stone-600';
   return n < 0 ? 'text-red-600' : 'text-slate-700';
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function amount(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function importSummary(label: string, result: { imported: number; updated: number; skipped: number; errors: string[] }) {
@@ -624,9 +635,246 @@ function JournalEntriesTab() {
   );
 }
 
+// ── Manual Entry tab ─────────────────────────────────────────────────────────
+
+interface ManualJournalLine {
+  account_id: string;
+  debit_amount: string;
+  credit_amount: string;
+  memo: string;
+}
+
+const blankJournalLine = (): ManualJournalLine => ({
+  account_id: '',
+  debit_amount: '',
+  credit_amount: '',
+  memo: '',
+});
+
+function ManualJournalEntryTab() {
+  const { data: accounts = [], isLoading: accountsLoading } = useFinanceAccounts();
+  const createJournal = useCreateJournalEntry();
+  const [entryDate, setEntryDate] = useState(todayIso());
+  const [description, setDescription] = useState('');
+  const [lines, setLines] = useState<ManualJournalLine[]>([
+    blankJournalLine(),
+    blankJournalLine(),
+  ]);
+
+  const debitTotal = lines.reduce((sum, line) => sum + amount(line.debit_amount), 0);
+  const creditTotal = lines.reduce((sum, line) => sum + amount(line.credit_amount), 0);
+  const difference = debitTotal - creditTotal;
+  const isBalanced = Math.round(debitTotal * 100) === Math.round(creditTotal * 100);
+  const hasValidLines = lines.filter((line) =>
+    line.account_id && (amount(line.debit_amount) > 0 || amount(line.credit_amount) > 0),
+  ).length >= 2;
+  const canPost = Boolean(entryDate && description.trim() && hasValidLines && isBalanced && debitTotal > 0);
+
+  const updateLine = (index: number, patch: Partial<ManualJournalLine>) => {
+    setLines((current) =>
+      current.map((line, lineIndex) => (
+        lineIndex === index ? { ...line, ...patch } : line
+      )),
+    );
+  };
+
+  const addLine = () => setLines((current) => [...current, blankJournalLine()]);
+
+  const removeLine = (index: number) => {
+    setLines((current) => (
+      current.length <= 2 ? current : current.filter((_, lineIndex) => lineIndex !== index)
+    ));
+  };
+
+  const resetForm = () => {
+    setEntryDate(todayIso());
+    setDescription('');
+    setLines([blankJournalLine(), blankJournalLine()]);
+  };
+
+  const handlePost = async () => {
+    if (!canPost) {
+      toast.error('Journal must have a date, description, at least two lines, and balanced debits/credits.');
+      return;
+    }
+
+    const payloadLines: CreateJournalLinePayload[] = lines
+      .filter((line) => line.account_id && (amount(line.debit_amount) > 0 || amount(line.credit_amount) > 0))
+      .map((line) => ({
+        account_id: line.account_id,
+        debit_amount: amount(line.debit_amount).toFixed(2),
+        credit_amount: amount(line.credit_amount).toFixed(2),
+        memo: line.memo.trim() || null,
+      }));
+
+    try {
+      const created = await createJournal.mutateAsync({
+        entry_date: entryDate,
+        description: description.trim(),
+        ref_type: 'manual',
+        ref_id: null,
+        lines: payloadLines,
+      });
+      toast.success(`Journal entry posted: ${created.entry_number}`);
+      resetForm();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to post journal entry.';
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-stone-200 bg-white p-4">
+        <div className="grid gap-3 md:grid-cols-[160px_1fr]">
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-stone-500">Date</span>
+            <Input
+              type="date"
+              value={entryDate}
+              onChange={(event) => setEntryDate(event.target.value)}
+              className="bg-white"
+            />
+          </label>
+          <label className="space-y-1">
+            <span className="text-xs font-medium text-stone-500">Description</span>
+            <Input
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              placeholder="e.g. Bank charges, owner capital, correction entry..."
+              className="bg-white"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-stone-50 hover:bg-stone-50">
+              <TableHead className="text-stone-600 font-medium text-xs">Account</TableHead>
+              <TableHead className="text-stone-600 font-medium text-xs text-right">Debit</TableHead>
+              <TableHead className="text-stone-600 font-medium text-xs text-right">Credit</TableHead>
+              <TableHead className="text-stone-600 font-medium text-xs">Memo</TableHead>
+              <TableHead className="w-20" />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((line, index) => (
+              <TableRow key={index} className="hover:bg-stone-50/50">
+                <TableCell>
+                  <select
+                    value={line.account_id}
+                    onChange={(event) => updateLine(index, { account_id: event.target.value })}
+                    disabled={accountsLoading}
+                    className="h-9 w-full rounded-lg border border-stone-200 bg-white px-2 text-sm text-slate-700 outline-none focus:border-slate-400"
+                  >
+                    <option value="">Select account...</option>
+                    {accounts.filter((account) => account.is_active).map((account) => (
+                      <option key={account.id} value={account.id}>
+                        {account.account_code} - {account.name}
+                      </option>
+                    ))}
+                  </select>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={line.debit_amount}
+                    onChange={(event) => updateLine(index, {
+                      debit_amount: event.target.value,
+                      credit_amount: event.target.value ? '' : line.credit_amount,
+                    })}
+                    className="ml-auto w-32 bg-white text-right"
+                    placeholder="0"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={line.credit_amount}
+                    onChange={(event) => updateLine(index, {
+                      credit_amount: event.target.value,
+                      debit_amount: event.target.value ? '' : line.debit_amount,
+                    })}
+                    className="ml-auto w-32 bg-white text-right"
+                    placeholder="0"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Input
+                    value={line.memo}
+                    onChange={(event) => updateLine(index, { memo: event.target.value })}
+                    className="bg-white"
+                    placeholder="Optional line note"
+                  />
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeLine(index)}
+                    disabled={lines.length <= 2}
+                    className="text-xs text-stone-500"
+                  >
+                    Remove
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            <TableRow className="bg-stone-50 hover:bg-stone-50">
+              <TableCell>
+                <Button type="button" variant="outline" size="sm" onClick={addLine}>
+                  Add Line
+                </Button>
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm font-semibold text-slate-700">
+                {money(debitTotal)}
+              </TableCell>
+              <TableCell className="text-right font-mono text-sm font-semibold text-slate-700">
+                {money(creditTotal)}
+              </TableCell>
+              <TableCell>
+                <Badge
+                  className={
+                    isBalanced && debitTotal > 0
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }
+                >
+                  {isBalanced ? 'Balanced' : `Difference ${money(Math.abs(difference))}`}
+                </Badge>
+              </TableCell>
+              <TableCell />
+            </TableRow>
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={resetForm}>
+          Clear
+        </Button>
+        <Button
+          type="button"
+          onClick={handlePost}
+          disabled={!canPost || createJournal.isPending}
+        >
+          {createJournal.isPending ? 'Posting...' : 'Post Journal Entry'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'trial-balance' | 'pl' | 'accounting-codes' | 'journal-entries';
+type Tab = 'trial-balance' | 'pl' | 'accounting-codes' | 'journal-entries' | 'manual-entry';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<Tab>('trial-balance');
@@ -636,6 +884,7 @@ export default function FinancePage() {
     { id: 'pl', label: 'Profit & Loss' },
     { id: 'accounting-codes', label: 'Accounting Codes' },
     { id: 'journal-entries', label: 'Journal Entries' },
+    { id: 'manual-entry', label: 'Manual Entry' },
   ];
 
   const activeContent = {
@@ -643,6 +892,7 @@ export default function FinancePage() {
     pl: <ProfitAndLossTab />,
     'accounting-codes': <AccountingCodesTab />,
     'journal-entries': <JournalEntriesTab />,
+    'manual-entry': <ManualJournalEntryTab />,
   }[activeTab];
 
   return (

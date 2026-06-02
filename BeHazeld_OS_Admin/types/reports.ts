@@ -95,6 +95,21 @@ export interface JournalEntryResponse {
   lines: JournalLineResponse[];
 }
 
+export interface CreateJournalLinePayload {
+  account_id: string;
+  debit_amount: string;
+  credit_amount: string;
+  memo: string | null;
+}
+
+export interface CreateJournalEntryPayload {
+  entry_date: string;
+  description: string;
+  ref_type: 'manual';
+  ref_id: string | null;
+  lines: CreateJournalLinePayload[];
+}
+
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {
