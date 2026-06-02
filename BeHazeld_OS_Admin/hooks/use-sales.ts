@@ -12,6 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import { importSalesInvoicesAction } from '@/lib/sales-actions';
 import type {
   CreateCustomerPayload,
   CreateSaleBillPayload,
@@ -106,10 +107,14 @@ export function useCreateSale() {
 export function useImportSalesInvoices() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const form = new FormData();
       form.append('file', file);
-      return apiClient.postForm<SalesInvoiceImportResponse>('/api/v1/sales/bills/import', form);
+      const result = await importSalesInvoicesAction(form);
+      if (!result.success || !result.data) {
+        throw new Error(result.message ?? 'Failed to import sales invoices.');
+      }
+      return result.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.all });
