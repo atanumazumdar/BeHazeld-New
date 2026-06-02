@@ -58,6 +58,13 @@ export interface ProfitAndLossReport {
   net_profit: string;
 }
 
+export interface FinanceImportResponse {
+  imported: number;
+  updated: number;
+  skipped: number;
+  errors: string[];
+}
+
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

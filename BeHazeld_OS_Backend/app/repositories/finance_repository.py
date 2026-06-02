@@ -50,6 +50,42 @@ class FinanceRepository:
         self.db.flush()
         return account
 
+    def upsert_account_by_code(
+        self,
+        tenant_id: uuid.UUID,
+        account_code: str,
+        name: str,
+        account_type: str,
+        is_active: bool = True,
+        parent_id: uuid.UUID | None = None,
+    ) -> tuple[ChartOfAccount, bool]:
+        stmt = (
+            select(ChartOfAccount)
+            .where(
+                ChartOfAccount.tenant_id == tenant_id,
+                ChartOfAccount.account_code == account_code,
+            )
+        )
+        account = self.db.execute(stmt).scalar_one_or_none()
+        created = account is None
+        if account is None:
+            account = ChartOfAccount(
+                tenant_id=tenant_id,
+                account_code=account_code,
+                name=name,
+                account_type=account_type,
+                parent_id=parent_id,
+                is_active=is_active,
+            )
+            self.db.add(account)
+        else:
+            account.name = name
+            account.account_type = account_type
+            account.parent_id = parent_id
+            account.is_active = is_active
+        self.db.flush()
+        return account, created
+
     def get_account_by_code(
         self, tenant_id: uuid.UUID, account_code: str
     ) -> ChartOfAccount:
@@ -98,6 +134,20 @@ class FinanceRepository:
             .where(JournalEntry.tenant_id == tenant_id)
         )
         return self.db.execute(stmt).scalar_one()
+
+    def get_journal_entry_by_number(
+        self,
+        tenant_id: uuid.UUID,
+        entry_number: str,
+    ) -> JournalEntry | None:
+        stmt = (
+            select(JournalEntry)
+            .where(
+                JournalEntry.tenant_id == tenant_id,
+                JournalEntry.entry_number == entry_number,
+            )
+        )
+        return self.db.execute(stmt).scalar_one_or_none()
 
     # ── Journal Entries ───────────────────────────────────────────────────────
 

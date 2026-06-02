@@ -10,7 +10,7 @@
  * All numbers use professional financial formatting (red for negative).
  */
 
-import { useState } from 'react';
+import { type ChangeEvent, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +31,8 @@ import {
 import {
   useTrialBalance,
   useProfitAndLoss,
+  useImportAccountCodes,
+  useImportJournalEntries,
   downloadTrialBalanceCsv,
   downloadProfitLossCsv,
 } from '@/hooks/use-reports';
@@ -53,6 +55,106 @@ function moneyClass(value: string): string {
   const n = parseFloat(value);
   if (isNaN(n) || n === 0) return 'text-stone-600';
   return n < 0 ? 'text-red-600' : 'text-slate-700';
+}
+
+function importSummary(label: string, result: { imported: number; updated: number; skipped: number; errors: string[] }) {
+  const summary = `${result.imported} imported${result.updated ? `, ${result.updated} updated` : ''}${result.skipped ? `, ${result.skipped} skipped` : ''}`;
+  if (result.errors.length > 0) {
+    toast.warning(`${label}: ${summary}. ${result.errors.length} issue${result.errors.length === 1 ? '' : 's'} found.`);
+  } else {
+    toast.success(`${label}: ${summary}.`);
+  }
+}
+
+function FinanceImportToolbar() {
+  const accountInputRef = useRef<HTMLInputElement | null>(null);
+  const journalInputRef = useRef<HTMLInputElement | null>(null);
+  const importAccounts = useImportAccountCodes();
+  const importJournals = useImportJournalEntries();
+
+  const handleAccountFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const result = await importAccounts.mutateAsync(file);
+      importSummary('Account codes imported', result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to import account codes.';
+      toast.error(message);
+    }
+  };
+
+  const handleJournalFile = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const result = await importJournals.mutateAsync(file);
+      importSummary('Journal entries imported', result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to import journal entries.';
+      toast.error(message);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-700">Finance CSV Imports</p>
+          <p className="mt-1 text-xs text-stone-500">
+            Import account codes first, then journal entries.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/templates/finance_account_codes_reference.csv"
+            className="inline-flex h-8 items-center rounded-lg border border-stone-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-stone-50"
+          >
+            Account Template
+          </a>
+          <a
+            href="/templates/finance_journal_entries_template.csv"
+            className="inline-flex h-8 items-center rounded-lg border border-stone-200 px-2.5 text-xs font-medium text-slate-700 hover:bg-stone-50"
+          >
+            Journal Template
+          </a>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => accountInputRef.current?.click()}
+            disabled={importAccounts.isPending}
+          >
+            {importAccounts.isPending ? 'Importing…' : 'Import Account Codes'}
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => journalInputRef.current?.click()}
+            disabled={importJournals.isPending}
+          >
+            {importJournals.isPending ? 'Importing…' : 'Import Journal Entries'}
+          </Button>
+        </div>
+      </div>
+      <input
+        ref={accountInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleAccountFile}
+      />
+      <input
+        ref={journalInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={handleJournalFile}
+      />
+    </div>
+  );
 }
 
 // ── Trial Balance tab ─────────────────────────────────────────────────────────
@@ -373,6 +475,8 @@ export default function FinancePage() {
           Read-only financial statements — all figures are tenant-scoped.
         </p>
       </div>
+
+      <FinanceImportToolbar />
 
       {/* Tab nav */}
       <nav className="flex gap-1 border-b border-stone-200">

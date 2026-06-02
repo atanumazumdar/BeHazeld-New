@@ -41,6 +41,13 @@ class CreateJournalEntryRequest(BaseModel):
     lines: list[CreateJournalLineRequest] = Field(..., min_length=2)
 
 
+class FinanceImportResponse(BaseModel):
+    imported: int
+    updated: int = 0
+    skipped: int = 0
+    errors: list[str] = Field(default_factory=list)
+
+
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class AccountResponse(BaseModel):

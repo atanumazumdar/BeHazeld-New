@@ -29,6 +29,8 @@ Standard COA codes used by automated posting
 """
 from __future__ import annotations
 
+import csv
+import io
 import uuid
 from datetime import date
 from decimal import Decimal
@@ -39,6 +41,7 @@ from app.core.exceptions import NotFoundError, UnbalancedJournalError
 from app.models.finance import AccountType, JournalRefType
 from app.repositories.finance_repository import FinanceRepository
 from app.schemas.finance import (
+    FinanceImportResponse,
     ProfitAndLossReport,
     TrialBalanceLine,
     TrialBalanceResponse,
@@ -122,6 +125,169 @@ class FinanceService:
 
     def list_accounts(self, tenant_id: uuid.UUID) -> list:
         return self.repo.list_accounts(tenant_id)
+
+    # ── CSV imports ───────────────────────────────────────────────────────────
+
+    def import_account_codes_csv(
+        self,
+        tenant_id: uuid.UUID,
+        content: bytes,
+    ) -> FinanceImportResponse:
+        reader = self._csv_dict_reader(content)
+        required = {"account_code", "account_name", "account_type"}
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"Missing required CSV columns: {', '.join(sorted(missing))}")
+
+        imported = 0
+        updated = 0
+        skipped = 0
+        errors: list[str] = []
+
+        try:
+            for line_number, row in enumerate(reader, start=2):
+                account_code = row.get("account_code", "").strip()
+                account_name = row.get("account_name", "").strip()
+                raw_account_type = row.get("account_type", "").strip()
+                status = row.get("status", "active").strip().casefold()
+
+                if not account_code or not account_name or not raw_account_type:
+                    errors.append(f"Line {line_number}: account_code, account_name and account_type are required")
+                    skipped += 1
+                    continue
+
+                try:
+                    account_type = self._normalize_account_type(raw_account_type)
+                except ValueError as exc:
+                    errors.append(f"Line {line_number}: {exc}")
+                    skipped += 1
+                    continue
+
+                _account, created = self.repo.upsert_account_by_code(
+                    tenant_id=tenant_id,
+                    account_code=account_code,
+                    name=account_name,
+                    account_type=account_type,
+                    is_active=status != "inactive",
+                )
+                if created:
+                    imported += 1
+                else:
+                    updated += 1
+
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return FinanceImportResponse(
+            imported=imported,
+            updated=updated,
+            skipped=skipped,
+            errors=errors,
+        )
+
+    def import_journal_entries_csv(
+        self,
+        tenant_id: uuid.UUID,
+        content: bytes,
+    ) -> FinanceImportResponse:
+        reader = self._csv_dict_reader(content)
+        required = {
+            "journal number",
+            "journal date",
+            "account",
+            "debit amount",
+            "credit amount",
+        }
+        missing = required - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"Missing required CSV columns: {', '.join(sorted(missing))}")
+
+        grouped: dict[str, list[dict[str, str]]] = {}
+        for row in reader:
+            journal_number = row.get("journal number", "").strip()
+            if not journal_number:
+                continue
+            grouped.setdefault(journal_number, []).append(row)
+
+        imported = 0
+        skipped = 0
+        errors: list[str] = []
+
+        try:
+            for journal_number, rows in grouped.items():
+                if self.repo.get_journal_entry_by_number(tenant_id, journal_number) is not None:
+                    skipped += 1
+                    continue
+
+                try:
+                    first = rows[0]
+                    entry_date = date.fromisoformat(first.get("journal date", "").strip())
+                    narration = first.get("narration", "").strip()
+                    invoice_number = first.get("invoice number", "").strip()
+                    description = narration or f"Imported journal {journal_number}"
+                    if invoice_number and invoice_number.upper() != "NA":
+                        description = f"{description} ({invoice_number})"
+
+                    total_dr = Decimal("0")
+                    total_cr = Decimal("0")
+                    parsed_lines: list[tuple[uuid.UUID, Decimal, Decimal, str | None]] = []
+
+                    for row in rows:
+                        account_code = self._parse_account_code(row.get("account", ""))
+                        account = self.repo.get_account_by_code(tenant_id, account_code)
+                        debit = self._decimal(row.get("debit amount", "0"))
+                        credit = self._decimal(row.get("credit amount", "0"))
+                        total_dr += debit
+                        total_cr += credit
+                        memo_parts = [
+                            part
+                            for part in [
+                                row.get("invoice number", "").strip(),
+                                row.get("narration", "").strip(),
+                            ]
+                            if part and part.upper() != "NA"
+                        ]
+                        parsed_lines.append((account.id, debit, credit, " - ".join(memo_parts) or None))
+
+                    if len(parsed_lines) < 2:
+                        raise ValueError("journal must contain at least two lines")
+                    if total_dr.quantize(Decimal("0.01")) != total_cr.quantize(Decimal("0.01")):
+                        raise ValueError(f"debits ({total_dr}) do not equal credits ({total_cr})")
+
+                    entry = self.repo.create_journal_entry(
+                        tenant_id=tenant_id,
+                        entry_number=journal_number,
+                        entry_date=entry_date,
+                        description=description[:500],
+                        ref_type=JournalRefType.MANUAL,
+                        ref_id=None,
+                    )
+                    for account_id, debit, credit, memo in parsed_lines:
+                        self.repo.create_journal_line(
+                            tenant_id=tenant_id,
+                            journal_id=entry.id,
+                            account_id=account_id,
+                            debit_amount=debit,
+                            credit_amount=credit,
+                            memo=memo,
+                        )
+                    imported += 1
+                except Exception as exc:
+                    errors.append(f"{journal_number}: {exc}")
+                    skipped += 1
+
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            raise
+
+        return FinanceImportResponse(
+            imported=imported,
+            skipped=skipped,
+            errors=errors,
+        )
 
     # ── Core journal posting ──────────────────────────────────────────────────
 
@@ -343,3 +509,39 @@ class FinanceService:
 
     def get_journal_entry(self, tenant_id: uuid.UUID, entry_id: uuid.UUID):
         return self.repo.get_journal_entry_by_id(tenant_id, entry_id)
+
+    def _csv_dict_reader(self, content: bytes) -> csv.DictReader:
+        try:
+            text = content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            text = content.decode("latin-1")
+        reader = csv.DictReader(io.StringIO(text))
+        if reader.fieldnames is None:
+            raise ValueError("CSV file is empty or missing a header row")
+        reader.fieldnames = [(field or "").strip().lower() for field in reader.fieldnames]
+        return reader
+
+    def _normalize_account_type(self, account_type: str) -> str:
+        normalized = account_type.strip().casefold()
+        if normalized == "cogs":
+            return AccountType.EXPENSE
+        allowed = {
+            AccountType.ASSET,
+            AccountType.LIABILITY,
+            AccountType.EQUITY,
+            AccountType.INCOME,
+            AccountType.EXPENSE,
+        }
+        if normalized not in allowed:
+            raise ValueError(f"unsupported account_type '{account_type}'")
+        return normalized
+
+    def _parse_account_code(self, account: str) -> str:
+        code = account.split("-", 1)[0].strip()
+        if not code:
+            raise ValueError("account code is required")
+        return code
+
+    def _decimal(self, value: str) -> Decimal:
+        cleaned = (value or "0").replace(",", "").strip()
+        return Decimal(cleaned or "0")

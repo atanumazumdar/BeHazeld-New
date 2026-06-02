@@ -14,11 +14,16 @@
  *   GET /exports/profit-loss.csv    → CSV download (imperative)
  */
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
+import {
+  importAccountCodesAction,
+  importJournalEntriesAction,
+} from '@/lib/finance-actions';
 import type {
   AuditLogEntry,
   DashboardMetrics,
+  FinanceImportResponse,
   GstSummary,
   LowStockItem,
   ProfitAndLossReport,
@@ -38,6 +43,25 @@ export const reportKeys = {
   auditLogs: (filters: Record<string, string | undefined>) =>
     ['audit', 'logs', filters] as const,
 };
+
+interface ActionResult<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+function requireActionData<T>(
+  result: ActionResult<T> | undefined,
+  fallbackMessage: string,
+): T {
+  if (!result) {
+    throw new Error('No response from the server. Please refresh and try again.');
+  }
+  if (!result.success || !result.data) {
+    throw new Error(result.message ?? fallbackMessage);
+  }
+  return result.data;
+}
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
@@ -94,6 +118,38 @@ export function useProfitAndLoss(fromDate?: string, toDate?: string) {
       apiClient.get<ProfitAndLossReport>(
         `/api/v1/finance/reports/profit-and-loss${qs ? `?${qs}` : ''}`,
       ),
+  });
+}
+
+export function useImportAccountCodes() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File): Promise<FinanceImportResponse> => {
+      const form = new FormData();
+      form.append('file', file);
+      const result = await importAccountCodesAction(form);
+      return requireActionData(result, 'Failed to import account codes.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
+      qc.invalidateQueries({ queryKey: reportKeys.pl() });
+    },
+  });
+}
+
+export function useImportJournalEntries() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File): Promise<FinanceImportResponse> => {
+      const form = new FormData();
+      form.append('file', file);
+      const result = await importJournalEntriesAction(form);
+      return requireActionData(result, 'Failed to import journal entries.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
+      qc.invalidateQueries({ queryKey: reportKeys.pl() });
+    },
   });
 }
 

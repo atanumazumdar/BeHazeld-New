@@ -15,15 +15,17 @@ GET  /reports/profit-and-loss          : finance.reports.view
 import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Query, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import TenantContext, get_current_tenant, require_permission
+from app.core.exceptions import ValidationError
 from app.db.session import get_db
 from app.schemas.finance import (
     AccountResponse,
     CreateAccountRequest,
     CreateJournalEntryRequest,
+    FinanceImportResponse,
     JournalEntryResponse,
     ProfitAndLossReport,
     TrialBalanceResponse,
@@ -81,6 +83,24 @@ def seed_default_coa(
     return created  # type: ignore[return-value]
 
 
+@router.post(
+    "/accounts/import",
+    response_model=FinanceImportResponse,
+)
+async def import_account_codes(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("finance.accounts.create")),
+    db: Session = Depends(get_db),
+) -> FinanceImportResponse:
+    if not _is_csv_upload(file):
+        raise ValidationError("Uploaded file must be a CSV")
+    try:
+        return FinanceService(db).import_account_codes_csv(ctx.tenant_id, await file.read())
+    except ValueError as exc:
+        db.rollback()
+        raise ValidationError(str(exc)) from exc
+
+
 # ── Journal Entries ───────────────────────────────────────────────────────────
 
 @router.get("/journals", response_model=list[JournalEntryResponse])
@@ -91,6 +111,24 @@ def list_journal_entries(
     db: Session = Depends(get_db),
 ) -> list[JournalEntryResponse]:
     return FinanceService(db).list_journal_entries(ctx.tenant_id, skip=skip, limit=limit)  # type: ignore[return-value]
+
+
+@router.post(
+    "/journals/import",
+    response_model=FinanceImportResponse,
+)
+async def import_journal_entries(
+    file: UploadFile = File(...),
+    ctx: TenantContext = Depends(require_permission("finance.journals.create")),
+    db: Session = Depends(get_db),
+) -> FinanceImportResponse:
+    if not _is_csv_upload(file):
+        raise ValidationError("Uploaded file must be a CSV")
+    try:
+        return FinanceService(db).import_journal_entries_csv(ctx.tenant_id, await file.read())
+    except ValueError as exc:
+        db.rollback()
+        raise ValidationError(str(exc)) from exc
 
 
 @router.get("/journals/{entry_id}", response_model=JournalEntryResponse)
@@ -148,3 +186,9 @@ def get_profit_and_loss(
     db: Session = Depends(get_db),
 ) -> ProfitAndLossReport:
     return FinanceService(db).get_profit_and_loss(ctx.tenant_id, from_date, to_date)
+
+
+def _is_csv_upload(file: UploadFile) -> bool:
+    is_csv_filename = bool(file.filename and file.filename.lower().endswith(".csv"))
+    is_csv_content = file.content_type in {"text/csv", "application/csv", "application/vnd.ms-excel"}
+    return is_csv_filename or is_csv_content
