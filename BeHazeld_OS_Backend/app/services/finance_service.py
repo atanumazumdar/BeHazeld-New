@@ -33,6 +33,7 @@ import csv
 import io
 import uuid
 from datetime import date
+from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import text
@@ -249,7 +250,7 @@ class FinanceService:
 
                 try:
                     first = rows[0]
-                    entry_date = date.fromisoformat(first.get("journal date", "").strip())
+                    entry_date = self._parse_date(first.get("journal date", ""))
                     narration = first.get("narration", "").strip()
                     invoice_number = first.get("invoice number", "").strip()
                     description = narration or f"Imported journal {journal_number}"
@@ -582,3 +583,18 @@ class FinanceService:
     def _decimal(self, value: str) -> Decimal:
         cleaned = (value or "0").replace(",", "").strip()
         return Decimal(cleaned or "0")
+
+    def _parse_date(self, value: str) -> date:
+        cleaned = (value or "").strip()
+        if not cleaned:
+            raise ValueError("journal date is required")
+
+        for fmt in ("%Y-%m-%d", "%d/%m/%y", "%d/%m/%Y", "%d-%m-%y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(cleaned, fmt).date()
+            except ValueError:
+                continue
+
+        raise ValueError(
+            f"unsupported journal date '{value}'. Use YYYY-MM-DD or DD/MM/YY."
+        )
