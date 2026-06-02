@@ -35,10 +35,12 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, UnbalancedJournalError
-from app.models.finance import AccountType, JournalRefType
+from app.db.base import Base
+from app.models.finance import AccountType, ChartOfAccount, JournalEntry, JournalLine, JournalRefType
 from app.repositories.finance_repository import FinanceRepository
 from app.schemas.finance import (
     FinanceImportResponse,
@@ -82,6 +84,25 @@ class FinanceService:
 
     # ── COA setup ─────────────────────────────────────────────────────────────
 
+    def ensure_finance_tables_available(self) -> None:
+        """Create finance schema tables on first-run production databases."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS finance"))
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                ChartOfAccount.__table__,
+                JournalEntry.__table__,
+                JournalLine.__table__,
+            ],
+        )
+
     def seed_default_coa(self, tenant_id: uuid.UUID) -> list:
         """
         Create the 9 standard accounts for a tenant.  Idempotent — any account
@@ -89,6 +110,7 @@ class FinanceService:
 
         Does NOT commit; caller must commit.
         """
+        self.ensure_finance_tables_available()
         created = []
         for code, name, account_type in _DEFAULT_COA:
             try:
@@ -112,6 +134,7 @@ class FinanceService:
         account_type: str,
         parent_id: uuid.UUID | None = None,
     ):
+        self.ensure_finance_tables_available()
         account = self.repo.create_account(
             tenant_id=tenant_id,
             account_code=account_code,
@@ -124,6 +147,7 @@ class FinanceService:
         return account
 
     def list_accounts(self, tenant_id: uuid.UUID) -> list:
+        self.ensure_finance_tables_available()
         return self.repo.list_accounts(tenant_id)
 
     # ── CSV imports ───────────────────────────────────────────────────────────
@@ -133,6 +157,7 @@ class FinanceService:
         tenant_id: uuid.UUID,
         content: bytes,
     ) -> FinanceImportResponse:
+        self.ensure_finance_tables_available()
         reader = self._csv_dict_reader(content)
         required = {"account_code", "account_name", "account_type"}
         missing = required - set(reader.fieldnames or [])
@@ -192,6 +217,7 @@ class FinanceService:
         tenant_id: uuid.UUID,
         content: bytes,
     ) -> FinanceImportResponse:
+        self.ensure_finance_tables_available()
         reader = self._csv_dict_reader(content)
         required = {
             "journal number",
@@ -300,6 +326,7 @@ class FinanceService:
         lines: list[tuple[uuid.UUID, Decimal, Decimal]],
         ref_id: uuid.UUID | None = None,
     ):
+        self.ensure_finance_tables_available()
         """
         Create a balanced journal entry (no commit — flush only).
 
@@ -458,6 +485,7 @@ class FinanceService:
     # ── Reports ───────────────────────────────────────────────────────────────
 
     def get_trial_balance(self, tenant_id: uuid.UUID) -> TrialBalanceResponse:
+        self.ensure_finance_tables_available()
         lines = self.repo.get_trial_balance(tenant_id)
         total_dr = sum(ln.total_debit  for ln in lines)
         total_cr = sum(ln.total_credit for ln in lines)
@@ -476,6 +504,7 @@ class FinanceService:
         from_date: date | None = None,
         to_date: date | None = None,
     ) -> ProfitAndLossReport:
+        self.ensure_finance_tables_available()
         revenue   = self.repo.get_balance_by_account_type(
             tenant_id, AccountType.INCOME, from_date, to_date
         )
@@ -505,9 +534,11 @@ class FinanceService:
     def list_journal_entries(
         self, tenant_id: uuid.UUID, skip: int = 0, limit: int = 50
     ) -> list:
+        self.ensure_finance_tables_available()
         return self.repo.list_journal_entries(tenant_id, skip=skip, limit=limit)
 
     def get_journal_entry(self, tenant_id: uuid.UUID, entry_id: uuid.UUID):
+        self.ensure_finance_tables_available()
         return self.repo.get_journal_entry_by_id(tenant_id, entry_id)
 
     def _csv_dict_reader(self, content: bytes) -> csv.DictReader:
@@ -526,11 +557,11 @@ class FinanceService:
         if normalized == "cogs":
             return AccountType.EXPENSE
         allowed = {
-            AccountType.ASSET,
-            AccountType.LIABILITY,
-            AccountType.EQUITY,
-            AccountType.INCOME,
-            AccountType.EXPENSE,
+            str(AccountType.ASSET),
+            str(AccountType.LIABILITY),
+            str(AccountType.EQUITY),
+            str(AccountType.INCOME),
+            str(AccountType.EXPENSE),
         }
         if normalized not in allowed:
             raise ValueError(f"unsupported account_type '{account_type}'")

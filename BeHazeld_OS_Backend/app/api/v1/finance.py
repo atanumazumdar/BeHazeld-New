@@ -99,6 +99,9 @@ async def import_account_codes(
     except ValueError as exc:
         db.rollback()
         raise ValidationError(str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise ValidationError(f"Account code import failed: {exc}") from exc
 
 
 # ── Journal Entries ───────────────────────────────────────────────────────────
@@ -129,6 +132,9 @@ async def import_journal_entries(
     except ValueError as exc:
         db.rollback()
         raise ValidationError(str(exc)) from exc
+    except Exception as exc:
+        db.rollback()
+        raise ValidationError(f"Journal entry import failed: {exc}") from exc
 
 
 @router.get("/journals/{entry_id}", response_model=JournalEntryResponse)
