@@ -19,6 +19,7 @@ from app.repositories.inventory_repository import InventoryRepository
 from app.repositories.tenant_repository import TenantRepository
 from app.schemas.inventory import (
     BinResponse,
+    BulkOpeningStockResponse,
     CreateBinRequest,
     InventoryLocationImportResponse,
     LocationResponse,
@@ -123,6 +124,23 @@ def record_movement(
         req=body,
         performed_by_user_id=ctx.user_id,
     )
+
+
+@router.post(
+    "/opening-stock/missing",
+    response_model=BulkOpeningStockResponse,
+)
+def record_missing_opening_stock(
+    ctx: TenantContext = Depends(require_permission("inventory.stock.adjust")),
+    db: Session = Depends(get_db),
+) -> BulkOpeningStockResponse:
+    try:
+        return InventoryService(db).record_missing_opening_stock(
+            tenant_id=ctx.tenant_id,
+            performed_by_user_id=ctx.user_id,
+        )
+    except ValueError as exc:
+        raise ValidationError(str(exc)) from exc
 
 
 # ── Balance / ledger queries ──────────────────────────────────────────────────

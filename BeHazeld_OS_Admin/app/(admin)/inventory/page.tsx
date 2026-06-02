@@ -9,9 +9,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import { useProducts } from '@/hooks/use-catalog';
-import { useStockedVariantIds } from '@/hooks/use-inventory';
+import { useRecordMissingOpeningStock, useStockedVariantIds } from '@/hooks/use-inventory';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -59,6 +61,7 @@ export default function InventoryPage() {
   const [search, setSearch] = useState('');
   const [showRecorded, setShowRecorded] = useState(false);
   const [debouncedSearch] = useDebounce(search, 400);
+  const recordMissingOpeningStock = useRecordMissingOpeningStock();
 
   const { data: products = [], isLoading } = useProducts({
     search: debouncedSearch || undefined,
@@ -91,6 +94,28 @@ export default function InventoryPage() {
     0,
   );
   const isTableLoading = isLoading || stockedLoading;
+  const unrecordedSkuCount = products.reduce(
+    (count, product) =>
+      count + (product.variants ?? []).filter((variant) => !stockedVariantIdSet.has(variant.id)).length,
+    0,
+  );
+
+  const handleBulkOpeningStock = async () => {
+    const confirmed = window.confirm(
+      'This will record opening_stock quantity 1 for every SKU that does not already have stock. Continue?',
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await recordMissingOpeningStock.mutateAsync();
+      toast.success(
+        `Opening stock recorded for ${result.created} SKU${result.created === 1 ? '' : 's'} at ${result.location_name} / ${result.bin_name}.`,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to record opening stock.';
+      toast.error(message);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -108,15 +133,24 @@ export default function InventoryPage() {
           onValueChange={setSearch}
           className="w-64 bg-white"
         />
-        <label className="flex items-center gap-2 text-sm text-stone-600">
-          <input
-            type="checkbox"
-            checked={showRecorded}
-            onChange={(event) => setShowRecorded(event.target.checked)}
-            className="h-4 w-4 accent-slate-800"
-          />
-          Show SKUs with recorded stock
-        </label>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-stone-600">
+            <input
+              type="checkbox"
+              checked={showRecorded}
+              onChange={(event) => setShowRecorded(event.target.checked)}
+              className="h-4 w-4 accent-slate-800"
+            />
+            Show SKUs with recorded stock
+          </label>
+          <Button
+            type="button"
+            onClick={handleBulkOpeningStock}
+            disabled={recordMissingOpeningStock.isPending || unrecordedSkuCount === 0}
+          >
+            {recordMissingOpeningStock.isPending ? 'Recording…' : 'Set All Missing to Opening Stock'}
+          </Button>
+        </div>
       </div>
 
       {!showRecorded && recordedSkuCount > 0 ? (

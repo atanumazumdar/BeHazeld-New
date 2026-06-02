@@ -19,8 +19,10 @@ import {
   listStockedVariantIdsAction,
   listLocationsAction,
   recordMovementAction,
+  recordMissingOpeningStockAction,
 } from '@/lib/inventory-actions';
 import type {
+  BulkOpeningStockResponse,
   InventoryLocationImportResponse,
   LocationResponse,
   RecordMovementPayload,
@@ -164,5 +166,18 @@ export function useImportLocationsBins() {
       return requireActionData(result, 'Failed to import locations/bins CSV.');
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: inventoryKeys.locations() }),
+  });
+}
+
+export function useRecordMissingOpeningStock() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<BulkOpeningStockResponse> => {
+      const result = await recordMissingOpeningStockAction();
+      return requireActionData(result, 'Failed to record opening stock.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: inventoryKeys.all });
+    },
   });
 }

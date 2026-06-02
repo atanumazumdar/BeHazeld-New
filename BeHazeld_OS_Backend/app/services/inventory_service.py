@@ -30,11 +30,13 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, StockNotAvailableError
 from app.db.base import Base
+from app.models.catalog import ProductVariant
 from app.models.inventory import Bin, MovementType, StockBalance, StockBatch, StockLedger
 from app.models.tenant import Company, Location
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.inventory_repository import InventoryRepository
 from app.schemas.inventory import (
+    BulkOpeningStockResponse,
     CreateBinRequest,
     InventoryLocationImportResponse,
     RecordMovementRequest,
@@ -318,6 +320,105 @@ class InventoryService:
     def list_variants_with_stock_balance(self, tenant_id: uuid.UUID) -> list[uuid.UUID]:
         self.ensure_inventory_tables_available()
         return self.repo.list_variants_with_stock_balance(tenant_id)
+
+    def record_missing_opening_stock(
+        self,
+        tenant_id: uuid.UUID,
+        performed_by_user_id: uuid.UUID | None = None,
+    ) -> BulkOpeningStockResponse:
+        """Create opening stock of 1 for every active SKU without any balance row."""
+        self.ensure_inventory_tables_available()
+        try:
+            location = self.db.scalar(
+                select(Location)
+                .where(Location.tenant_id == tenant_id, Location.is_active.is_(True))
+                .order_by(Location.name)
+            )
+            if location is None:
+                raise ValueError("No active location found. Please import or create a location first.")
+
+            bin_obj = self.db.scalar(
+                select(Bin)
+                .where(
+                    Bin.tenant_id == tenant_id,
+                    Bin.location_id == location.id,
+                    Bin.is_active.is_(True),
+                    Bin.is_default.is_(True),
+                )
+                .order_by(Bin.name)
+            )
+            if bin_obj is None:
+                bin_obj = self.db.scalar(
+                    select(Bin)
+                    .where(
+                        Bin.tenant_id == tenant_id,
+                        Bin.location_id == location.id,
+                        Bin.is_active.is_(True),
+                    )
+                    .order_by(Bin.name)
+                )
+            if bin_obj is None:
+                bin_obj = self.repo.create_bin(tenant_id, location.id, "Main", is_default=True)
+
+            stocked_variant_ids = set(self.repo.list_variants_with_stock_balance(tenant_id))
+            active_variants = list(
+                self.db.scalars(
+                    select(ProductVariant)
+                    .where(
+                        ProductVariant.tenant_id == tenant_id,
+                        ProductVariant.status == "active",
+                    )
+                    .order_by(ProductVariant.sku_code)
+                )
+            )
+            missing_variants = [
+                variant for variant in active_variants if variant.id not in stocked_variant_ids
+            ]
+
+            quantity = Decimal("1")
+            for variant in missing_variants:
+                unit_cost = variant.cost_price or Decimal("0")
+                ledger_entry = self.repo.append_ledger_entry(
+                    tenant_id=tenant_id,
+                    product_variant_id=variant.id,
+                    location_id=location.id,
+                    bin_id=bin_obj.id,
+                    movement_type=MovementType.OPENING_STOCK,
+                    quantity_change=quantity,
+                    unit_cost=unit_cost,
+                    notes="Bulk opening stock: default quantity 1",
+                    performed_by_user_id=performed_by_user_id,
+                )
+                self.repo.create_batch(
+                    tenant_id=tenant_id,
+                    product_variant_id=variant.id,
+                    location_id=location.id,
+                    bin_id=bin_obj.id,
+                    batch_number=str(ledger_entry.id),
+                    initial_quantity=quantity,
+                    unit_cost=unit_cost,
+                    notes="Bulk opening stock: default quantity 1",
+                )
+                self.repo.upsert_balance(
+                    tenant_id=tenant_id,
+                    product_variant_id=variant.id,
+                    location_id=location.id,
+                    bin_id=bin_obj.id,
+                    quantity_delta=quantity,
+                )
+
+            self.db.commit()
+            return BulkOpeningStockResponse(
+                created=len(missing_variants),
+                skipped=len(stocked_variant_ids),
+                location_id=location.id,
+                location_name=location.name,
+                bin_id=bin_obj.id,
+                bin_name=bin_obj.name,
+            )
+        except Exception:
+            self.db.rollback()
+            raise
 
     def get_balance(
         self,

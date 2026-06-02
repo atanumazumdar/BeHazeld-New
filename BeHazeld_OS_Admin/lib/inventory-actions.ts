@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 
 import type {
+  BulkOpeningStockResponse,
   InventoryLocationImportResponse,
   LocationResponse,
   RecordMovementPayload,
@@ -196,6 +197,33 @@ export async function recordMovementAction(
   return {
     success: true,
     data: (await response.json()) as StockMovementResponse,
+  };
+}
+
+export async function recordMissingOpeningStockAction(): Promise<InventoryActionResult<BulkOpeningStockResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth('/api/v1/inventory/opening-stock/missing', {
+      method: 'POST',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to record opening stock.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as BulkOpeningStockResponse,
   };
 }
 

@@ -27,6 +27,15 @@ export interface InventoryLocationImportResponse {
   errors: string[];
 }
 
+export interface BulkOpeningStockResponse {
+  created: number;
+  skipped: number;
+  location_id: string;
+  location_name: string;
+  bin_id: string;
+  bin_name: string;
+}
+
 export type MovementType =
   | 'opening_stock'
   | 'purchase_in'

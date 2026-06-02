@@ -33,6 +33,15 @@ class InventoryLocationImportResponse(BaseModel):
     errors: list[str]
 
 
+class BulkOpeningStockResponse(BaseModel):
+    created: int
+    skipped: int
+    location_id: uuid.UUID
+    location_name: str
+    bin_id: uuid.UUID
+    bin_name: str
+
+
 class RecordMovementRequest(BaseModel):
     product_variant_id: uuid.UUID
     location_id: uuid.UUID
