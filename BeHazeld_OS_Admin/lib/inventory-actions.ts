@@ -229,6 +229,34 @@ export async function getStockSummaryAction(
   };
 }
 
+export async function listStockedVariantIdsAction(): Promise<InventoryActionResult<string[]>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth('/api/v1/inventory/stocked-variants', {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load recorded SKUs.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as string[],
+  };
+}
+
 export async function getLedgerAction(
   variantId: string,
   locationId: string,

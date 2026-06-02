@@ -156,6 +156,17 @@ def get_stock_summary(
 
 
 @router.get(
+    "/stocked-variants",
+    response_model=list[uuid.UUID],
+)
+def list_stocked_variants(
+    ctx: TenantContext = Depends(require_permission("inventory.view")),
+    db: Session = Depends(get_db),
+) -> list[uuid.UUID]:
+    return InventoryService(db).list_variants_with_stock_balance(ctx.tenant_id)
+
+
+@router.get(
     "/ledger/{product_variant_id}",
     response_model=list[StockMovementResponse],
 )

@@ -16,6 +16,7 @@ import {
   getLedgerAction,
   getStockSummaryAction,
   importLocationsBinsAction,
+  listStockedVariantIdsAction,
   listLocationsAction,
   recordMovementAction,
 } from '@/lib/inventory-actions';
@@ -51,6 +52,7 @@ function requireActionData<T>(
 export const inventoryKeys = {
   all: ['inventory'] as const,
   locations: () => [...inventoryKeys.all, 'locations'] as const,
+  stockedVariants: () => [...inventoryKeys.all, 'stocked-variants'] as const,
   balance: (variantId: string, locationId: string, binId: string) =>
     [...inventoryKeys.all, 'balance', variantId, locationId, binId] as const,
   summary: (variantId: string) =>
@@ -67,6 +69,16 @@ export function useLocations() {
     queryFn: async () => {
       const result = await listLocationsAction();
       return requireActionData(result, 'Failed to load locations.');
+    },
+  });
+}
+
+export function useStockedVariantIds() {
+  return useQuery({
+    queryKey: inventoryKeys.stockedVariants(),
+    queryFn: async () => {
+      const result = await listStockedVariantIdsAction();
+      return requireActionData(result, 'Failed to load recorded SKUs.');
     },
   });
 }
@@ -134,6 +146,9 @@ export function useRecordMovement() {
           variables.product_variant_id,
           variables.location_id,
         ),
+      });
+      qc.invalidateQueries({
+        queryKey: inventoryKeys.stockedVariants(),
       });
     },
   });

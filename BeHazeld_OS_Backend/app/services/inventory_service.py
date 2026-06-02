@@ -315,6 +315,10 @@ class InventoryService:
         self.ensure_inventory_tables_available()
         return self.repo.get_stock_summary(tenant_id, product_variant_id)
 
+    def list_variants_with_stock_balance(self, tenant_id: uuid.UUID) -> list[uuid.UUID]:
+        self.ensure_inventory_tables_available()
+        return self.repo.list_variants_with_stock_balance(tenant_id)
+
     def get_balance(
         self,
         tenant_id: uuid.UUID,

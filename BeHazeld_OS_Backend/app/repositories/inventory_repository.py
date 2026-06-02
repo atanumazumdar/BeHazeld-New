@@ -253,3 +253,13 @@ class InventoryRepository:
                 )
             )
         )
+
+    def list_variants_with_stock_balance(self, tenant_id: uuid.UUID) -> list[uuid.UUID]:
+        """Return SKU ids that already have at least one stock balance row."""
+        return list(
+            self.db.scalars(
+                select(StockBalance.product_variant_id)
+                .where(StockBalance.tenant_id == tenant_id)
+                .distinct()
+            )
+        )
