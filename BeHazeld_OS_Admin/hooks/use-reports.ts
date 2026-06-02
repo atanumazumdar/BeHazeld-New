@@ -23,8 +23,10 @@ import {
 import type {
   AuditLogEntry,
   DashboardMetrics,
+  FinanceAccountResponse,
   FinanceImportResponse,
   GstSummary,
+  JournalEntryResponse,
   LowStockItem,
   ProfitAndLossReport,
   TrialBalanceResponse,
@@ -40,6 +42,8 @@ export const reportKeys = {
   gst: (from?: string, to?: string) => ['reports', 'gst', from, to] as const,
   trialBalance: ['finance', 'trial-balance'] as const,
   pl: (from?: string, to?: string) => ['finance', 'pl', from, to] as const,
+  accounts: ['finance', 'accounts'] as const,
+  journals: ['finance', 'journals'] as const,
   auditLogs: (filters: Record<string, string | undefined>) =>
     ['audit', 'logs', filters] as const,
 };
@@ -121,6 +125,20 @@ export function useProfitAndLoss(fromDate?: string, toDate?: string) {
   });
 }
 
+export function useFinanceAccounts() {
+  return useQuery({
+    queryKey: reportKeys.accounts,
+    queryFn: () => apiClient.get<FinanceAccountResponse[]>('/api/v1/finance/accounts'),
+  });
+}
+
+export function useJournalEntries() {
+  return useQuery({
+    queryKey: reportKeys.journals,
+    queryFn: () => apiClient.get<JournalEntryResponse[]>('/api/v1/finance/journals?limit=200'),
+  });
+}
+
 export function useImportAccountCodes() {
   const qc = useQueryClient();
   return useMutation({
@@ -131,6 +149,7 @@ export function useImportAccountCodes() {
       return requireActionData(result, 'Failed to import account codes.');
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.accounts });
       qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
       qc.invalidateQueries({ queryKey: reportKeys.pl() });
     },
@@ -147,6 +166,7 @@ export function useImportJournalEntries() {
       return requireActionData(result, 'Failed to import journal entries.');
     },
     onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.journals });
       qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
       qc.invalidateQueries({ queryKey: reportKeys.pl() });
     },

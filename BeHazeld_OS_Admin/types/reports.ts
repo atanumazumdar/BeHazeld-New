@@ -65,6 +65,36 @@ export interface FinanceImportResponse {
   errors: string[];
 }
 
+export interface FinanceAccountResponse {
+  id: string;
+  tenant_id: string;
+  parent_id: string | null;
+  account_code: string;
+  name: string;
+  account_type: string;
+  is_active: boolean;
+}
+
+export interface JournalLineResponse {
+  id: string;
+  account_id: string;
+  debit_amount: string;
+  credit_amount: string;
+  memo: string | null;
+}
+
+export interface JournalEntryResponse {
+  id: string;
+  tenant_id: string;
+  entry_number: string;
+  entry_date: string;
+  description: string;
+  ref_type: string;
+  ref_id: string | null;
+  status: string;
+  lines: JournalLineResponse[];
+}
+
 // ── Audit Log ─────────────────────────────────────────────────────────────────
 
 export interface AuditLogEntry {

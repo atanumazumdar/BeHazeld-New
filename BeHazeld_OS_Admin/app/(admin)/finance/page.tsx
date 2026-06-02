@@ -31,6 +31,8 @@ import {
 import {
   useTrialBalance,
   useProfitAndLoss,
+  useFinanceAccounts,
+  useJournalEntries,
   useImportAccountCodes,
   useImportJournalEntries,
   downloadTrialBalanceCsv,
@@ -459,9 +461,160 @@ function PLRow({
   );
 }
 
+// ── Accounting Codes tab ─────────────────────────────────────────────────────
+
+function AccountingCodesTab() {
+  const { data: accounts = [], isLoading } = useFinanceAccounts();
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-stone-50 hover:bg-stone-50">
+            <TableHead className="text-stone-600 font-medium text-xs w-24">Code</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs">Account</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs">Type</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <TableRow key={i}>
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : accounts.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={4} className="py-12 text-center text-stone-400">
+                No accounting codes found. Import Account Codes CSV first.
+              </TableCell>
+            </TableRow>
+          ) : (
+            accounts.map((account) => (
+              <TableRow key={account.id} className="hover:bg-stone-50/50">
+                <TableCell className="font-mono text-xs text-stone-500">
+                  {account.account_code}
+                </TableCell>
+                <TableCell className="text-sm font-medium text-slate-700">
+                  {account.name}
+                </TableCell>
+                <TableCell className="text-xs capitalize text-stone-500">
+                  {account.account_type}
+                </TableCell>
+                <TableCell>
+                  <Badge
+                    className={
+                      account.is_active
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : 'bg-stone-100 text-stone-500'
+                    }
+                  >
+                    {account.is_active ? 'active' : 'inactive'}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// ── Journal Entries tab ──────────────────────────────────────────────────────
+
+function JournalEntriesTab() {
+  const { data: accounts = [] } = useFinanceAccounts();
+  const { data: journals = [], isLoading } = useJournalEntries();
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-stone-50 hover:bg-stone-50">
+            <TableHead className="text-stone-600 font-medium text-xs w-36">Journal</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs w-28">Date</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs">Account / Description</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs text-right">Debit</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs text-right">Credit</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs">Status</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <TableRow key={i}>
+                {Array.from({ length: 6 }).map((_, j) => (
+                  <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : journals.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="py-12 text-center text-stone-400">
+                No journal entries found. Import Journal Entries CSV first.
+              </TableCell>
+            </TableRow>
+          ) : (
+            journals.flatMap((journal) => [
+              <TableRow key={journal.id} className="bg-stone-50/60 hover:bg-stone-50/60">
+                <TableCell className="font-mono text-xs font-semibold text-slate-700">
+                  {journal.entry_number}
+                </TableCell>
+                <TableCell className="text-xs text-stone-500">
+                  {journal.entry_date}
+                </TableCell>
+                <TableCell className="text-sm font-medium text-slate-700">
+                  {journal.description}
+                </TableCell>
+                <TableCell />
+                <TableCell />
+                <TableCell>
+                  <Badge className="bg-blue-100 text-blue-700">{journal.status}</Badge>
+                </TableCell>
+              </TableRow>,
+              ...journal.lines.map((line) => {
+                const account = accountById.get(line.account_id);
+                const accountLabel = account
+                  ? `${account.account_code} - ${account.name}`
+                  : line.account_id.slice(0, 8);
+                return (
+                  <TableRow key={line.id} className="hover:bg-stone-50/50">
+                    <TableCell />
+                    <TableCell />
+                    <TableCell>
+                      <div className="pl-4">
+                        <p className="text-sm text-slate-700">{accountLabel}</p>
+                        {line.memo ? (
+                          <p className="mt-0.5 text-xs text-stone-400">{line.memo}</p>
+                        ) : null}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm text-slate-600">
+                      {parseFloat(line.debit_amount) > 0 ? money(line.debit_amount) : '—'}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-sm text-slate-600">
+                      {parseFloat(line.credit_amount) > 0 ? money(line.credit_amount) : '—'}
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                );
+              }),
+            ])
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-type Tab = 'trial-balance' | 'pl';
+type Tab = 'trial-balance' | 'pl' | 'accounting-codes' | 'journal-entries';
 
 export default function FinancePage() {
   const [activeTab, setActiveTab] = useState<Tab>('trial-balance');
@@ -469,7 +622,16 @@ export default function FinancePage() {
   const TABS: { id: Tab; label: string }[] = [
     { id: 'trial-balance', label: 'Trial Balance' },
     { id: 'pl', label: 'Profit & Loss' },
+    { id: 'accounting-codes', label: 'Accounting Codes' },
+    { id: 'journal-entries', label: 'Journal Entries' },
   ];
+
+  const activeContent = {
+    'trial-balance': <TrialBalanceTab />,
+    pl: <ProfitAndLossTab />,
+    'accounting-codes': <AccountingCodesTab />,
+    'journal-entries': <JournalEntriesTab />,
+  }[activeTab];
 
   return (
     <div className="space-y-6">
@@ -502,7 +664,7 @@ export default function FinancePage() {
       </nav>
 
       {/* Tab content */}
-      {activeTab === 'trial-balance' ? <TrialBalanceTab /> : <ProfitAndLossTab />}
+      {activeContent}
     </div>
   );
 }
