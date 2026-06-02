@@ -6,6 +6,8 @@ import type {
   FinanceAccountResponse,
   FinanceImportResponse,
   JournalEntryResponse,
+  ProfitAndLossReport,
+  TrialBalanceResponse,
 } from '@/types/reports';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
@@ -186,4 +188,22 @@ export async function listFinanceAccountsAction(): Promise<FinanceActionResult<F
 
 export async function listJournalEntriesAction(): Promise<FinanceActionResult<JournalEntryResponse[]>> {
   return getFinanceData('/api/v1/finance/journals?limit=200', 'Failed to load journal entries.');
+}
+
+export async function getTrialBalanceAction(): Promise<FinanceActionResult<TrialBalanceResponse>> {
+  return getFinanceData('/api/v1/finance/reports/trial-balance', 'Failed to load trial balance.');
+}
+
+export async function getProfitAndLossAction(
+  fromDate?: string,
+  toDate?: string,
+): Promise<FinanceActionResult<ProfitAndLossReport>> {
+  const params = new URLSearchParams();
+  if (fromDate) params.set('from_date', fromDate);
+  if (toDate) params.set('to_date', toDate);
+  const qs = params.toString();
+  return getFinanceData(
+    `/api/v1/finance/reports/profit-and-loss${qs ? `?${qs}` : ''}`,
+    'Failed to load profit and loss.',
+  );
 }

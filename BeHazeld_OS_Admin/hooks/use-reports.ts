@@ -17,6 +17,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
 import {
+  getProfitAndLossAction,
+  getTrialBalanceAction,
   importAccountCodesAction,
   importJournalEntriesAction,
   listFinanceAccountsAction,
@@ -107,23 +109,20 @@ export function useGstSummary(fromDate?: string, toDate?: string) {
 export function useTrialBalance() {
   return useQuery({
     queryKey: reportKeys.trialBalance,
-    queryFn: () =>
-      apiClient.get<TrialBalanceResponse>('/api/v1/finance/reports/trial-balance'),
+    queryFn: async () => {
+      const result = await getTrialBalanceAction();
+      return requireActionData(result, 'Failed to load trial balance.');
+    },
   });
 }
 
 export function useProfitAndLoss(fromDate?: string, toDate?: string) {
-  const params = new URLSearchParams();
-  if (fromDate) params.set('from_date', fromDate);
-  if (toDate) params.set('to_date', toDate);
-  const qs = params.toString();
-
   return useQuery({
     queryKey: reportKeys.pl(fromDate, toDate),
-    queryFn: () =>
-      apiClient.get<ProfitAndLossReport>(
-        `/api/v1/finance/reports/profit-and-loss${qs ? `?${qs}` : ''}`,
-      ),
+    queryFn: async () => {
+      const result = await getProfitAndLossAction(fromDate, toDate);
+      return requireActionData(result, 'Failed to load profit and loss.');
+    },
   });
 }
 
