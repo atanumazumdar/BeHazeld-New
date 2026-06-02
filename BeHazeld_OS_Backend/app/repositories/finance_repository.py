@@ -18,7 +18,7 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.exceptions import NotFoundError
 from app.models.finance import AccountType, ChartOfAccount, JournalEntry, JournalLine
@@ -198,6 +198,7 @@ class FinanceRepository:
     ) -> list[JournalEntry]:
         stmt = (
             select(JournalEntry)
+            .options(selectinload(JournalEntry.lines))
             .where(JournalEntry.tenant_id == tenant_id)
             .order_by(JournalEntry.entry_date.desc(), JournalEntry.entry_number.desc())
             .offset(skip)

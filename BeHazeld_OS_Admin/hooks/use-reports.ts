@@ -160,6 +160,7 @@ export function useImportAccountCodes() {
       qc.invalidateQueries({ queryKey: reportKeys.accounts });
       qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
       qc.invalidateQueries({ queryKey: reportKeys.pl() });
+      qc.refetchQueries({ queryKey: reportKeys.accounts });
     },
   });
 }
@@ -177,6 +178,7 @@ export function useImportJournalEntries() {
       qc.invalidateQueries({ queryKey: reportKeys.journals });
       qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
       qc.invalidateQueries({ queryKey: reportKeys.pl() });
+      qc.refetchQueries({ queryKey: reportKeys.journals });
     },
   });
 }

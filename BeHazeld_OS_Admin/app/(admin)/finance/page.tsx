@@ -464,7 +464,7 @@ function PLRow({
 // ── Accounting Codes tab ─────────────────────────────────────────────────────
 
 function AccountingCodesTab() {
-  const { data: accounts = [], isLoading } = useFinanceAccounts();
+  const { data: accounts = [], error, isLoading } = useFinanceAccounts();
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
@@ -478,7 +478,13 @@ function AccountingCodesTab() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {error ? (
+            <TableRow>
+              <TableCell colSpan={4} className="py-12 text-center text-red-600">
+                {error instanceof Error ? error.message : 'Failed to load accounting codes.'}
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <TableRow key={i}>
                 {Array.from({ length: 4 }).map((_, j) => (
@@ -528,7 +534,7 @@ function AccountingCodesTab() {
 
 function JournalEntriesTab() {
   const { data: accounts = [] } = useFinanceAccounts();
-  const { data: journals = [], isLoading } = useJournalEntries();
+  const { data: journals = [], error, isLoading } = useJournalEntries();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
 
   return (
@@ -545,7 +551,13 @@ function JournalEntriesTab() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {isLoading ? (
+          {error ? (
+            <TableRow>
+              <TableCell colSpan={6} className="py-12 text-center text-red-600">
+                {error instanceof Error ? error.message : 'Failed to load journal entries.'}
+              </TableCell>
+            </TableRow>
+          ) : isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <TableRow key={i}>
                 {Array.from({ length: 6 }).map((_, j) => (
