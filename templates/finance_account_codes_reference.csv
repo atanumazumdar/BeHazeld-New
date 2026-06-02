@@ -1,0 +1,10 @@
+account_code,account_name,account_type,normal_balance,typical_use
+1100,Cash and Bank,asset,Debit,"Cash received, bank payments, deposits"
+1200,Accounts Receivable,asset,Debit,Customer balances due
+1300,Inventory Asset,asset,Debit,Stock value on hand
+2000,Accounts Payable,liability,Credit,Vendor balances payable
+3000,Owner's Equity,equity,Credit,Owner capital and retained equity
+4000,Sales Revenue,income,Credit,Sales income
+4100,Other Income,income,Credit,Non-sales income
+5000,Cost of Goods Sold (COGS),expense,Debit,Cost of sold inventory
+5100,Operating Expenses,expense,Debit,"Rent, marketing, salaries, software, utilities"

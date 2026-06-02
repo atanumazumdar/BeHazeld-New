@@ -1,0 +1,5 @@
+voucher_no,entry_date,description,line_no,account_code,account_name_optional,debit_amount,credit_amount,memo
+JV-0001,2026-06-02,Owner capital introduced,1,1100,Cash and Bank,50000,0,Cash deposited by owner
+JV-0001,2026-06-02,Owner capital introduced,2,3000,Owner's Equity,0,50000,Capital introduced
+JV-0002,2026-06-02,Paid office expense,1,5100,Operating Expenses,2500,0,Stationery and office supplies
+JV-0002,2026-06-02,Paid office expense,2,1100,Cash and Bank,0,2500,Paid from bank
