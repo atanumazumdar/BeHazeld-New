@@ -60,7 +60,12 @@ function moneyClass(value: string): string {
 function importSummary(label: string, result: { imported: number; updated: number; skipped: number; errors: string[] }) {
   const summary = `${result.imported} imported${result.updated ? `, ${result.updated} updated` : ''}${result.skipped ? `, ${result.skipped} skipped` : ''}`;
   if (result.errors.length > 0) {
-    toast.warning(`${label}: ${summary}. ${result.errors.length} issue${result.errors.length === 1 ? '' : 's'} found.`);
+    const visibleErrors = result.errors.slice(0, 4).join('\n');
+    const extraErrors = result.errors.length > 4 ? `\n...and ${result.errors.length - 4} more.` : '';
+    toast.warning(`${label}: ${summary}.`, {
+      description: `${visibleErrors}${extraErrors}`,
+      duration: 12000,
+    });
   } else {
     toast.success(`${label}: ${summary}.`);
   }

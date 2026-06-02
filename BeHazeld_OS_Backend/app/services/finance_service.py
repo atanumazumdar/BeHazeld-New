@@ -262,7 +262,13 @@ class FinanceService:
 
                     for row in rows:
                         account_code = self._parse_account_code(row.get("account", ""))
-                        account = self.repo.get_account_by_code(tenant_id, account_code)
+                        try:
+                            account = self.repo.get_account_by_code(tenant_id, account_code)
+                        except NotFoundError as exc:
+                            raise ValueError(
+                                f"account code '{account_code}' was not found. "
+                                "Import Accounting Codes.csv first, then retry journal import."
+                            ) from exc
                         debit = self._decimal(row.get("debit amount", "0"))
                         credit = self._decimal(row.get("credit amount", "0"))
                         total_dr += debit
