@@ -2,7 +2,11 @@
 
 import { cookies } from 'next/headers';
 
-import type { FinanceImportResponse } from '@/types/reports';
+import type {
+  FinanceAccountResponse,
+  FinanceImportResponse,
+  JournalEntryResponse,
+} from '@/types/reports';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 const ACCESS_MAX_AGE = 30 * 60;
@@ -143,4 +147,43 @@ export async function importJournalEntriesAction(
   formData: FormData,
 ): Promise<FinanceActionResult<FinanceImportResponse>> {
   return importFinanceCsv('/api/v1/finance/journals/import', formData, 'Failed to import journal entries.');
+}
+
+async function getFinanceData<T>(
+  path: string,
+  fallback: string,
+): Promise<FinanceActionResult<T>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(path, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, fallback),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as T,
+  };
+}
+
+export async function listFinanceAccountsAction(): Promise<FinanceActionResult<FinanceAccountResponse[]>> {
+  return getFinanceData('/api/v1/finance/accounts', 'Failed to load accounting codes.');
+}
+
+export async function listJournalEntriesAction(): Promise<FinanceActionResult<JournalEntryResponse[]>> {
+  return getFinanceData('/api/v1/finance/journals?limit=200', 'Failed to load journal entries.');
 }

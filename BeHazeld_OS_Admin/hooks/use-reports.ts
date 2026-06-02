@@ -19,6 +19,8 @@ import { apiClient } from '@/lib/api-client';
 import {
   importAccountCodesAction,
   importJournalEntriesAction,
+  listFinanceAccountsAction,
+  listJournalEntriesAction,
 } from '@/lib/finance-actions';
 import type {
   AuditLogEntry,
@@ -128,14 +130,20 @@ export function useProfitAndLoss(fromDate?: string, toDate?: string) {
 export function useFinanceAccounts() {
   return useQuery({
     queryKey: reportKeys.accounts,
-    queryFn: () => apiClient.get<FinanceAccountResponse[]>('/api/v1/finance/accounts'),
+    queryFn: async () => {
+      const result = await listFinanceAccountsAction();
+      return requireActionData(result, 'Failed to load accounting codes.');
+    },
   });
 }
 
 export function useJournalEntries() {
   return useQuery({
     queryKey: reportKeys.journals,
-    queryFn: () => apiClient.get<JournalEntryResponse[]>('/api/v1/finance/journals?limit=200'),
+    queryFn: async () => {
+      const result = await listJournalEntriesAction();
+      return requireActionData(result, 'Failed to load journal entries.');
+    },
   });
 }
 
