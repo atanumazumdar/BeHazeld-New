@@ -124,6 +124,7 @@ class SalesService:
         tenant_name: str = "BeHazeld",
         performed_by_user_id: uuid.UUID | None = None,
         invoice_number_override: str | None = None,
+        generate_pdf: bool = True,
     ) -> tuple[SaleBill, InvoiceMetadata]:
         """
         Execute the atomic sale transaction.
@@ -213,7 +214,11 @@ class SalesService:
                 total_discount=total_discount,
                 payment=req.payment,
             )
-            pdf_bytes = report_service.generate_invoice_pdf(bill_proxy, tenant_name)
+            pdf_bytes = (
+                report_service.generate_invoice_pdf(bill_proxy, tenant_name)
+                if generate_pdf
+                else b""
+            )
 
             # ── Phase 3a: create bill header ──────────────────────────────────
             bill = self.repo.create_bill(
@@ -293,7 +298,11 @@ class SalesService:
             raise
 
         # ── Phase 4: save PDF to disk (post-commit; safe to retry) ───────────
-        metadata = report_service.save_invoice_pdf(pdf_bytes, tenant_id, invoice_number)
+        metadata = (
+            report_service.save_invoice_pdf(pdf_bytes, tenant_id, invoice_number)
+            if generate_pdf
+            else InvoiceMetadata(invoice_number=invoice_number, file_path="", file_size_bytes=0)
+        )
         return bill, metadata
 
     # ── Sales CSV import ─────────────────────────────────────────────────────
@@ -410,6 +419,7 @@ class SalesService:
                     req=req,
                     performed_by_user_id=performed_by_user_id,
                     invoice_number_override=invoice_number,
+                    generate_pdf=False,
                 )
                 imported += 1
                 invoices.append(invoice_number)

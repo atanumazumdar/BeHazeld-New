@@ -110,11 +110,18 @@ async def import_sale_bills(
         from app.core.exceptions import ValidationError
         raise ValidationError("Uploaded file must be a CSV")
 
-    return SalesService(db).import_invoice_csv(
-        tenant_id=ctx.tenant_id,
-        csv_bytes=await file.read(),
-        performed_by_user_id=ctx.user_id,
-    )
+    try:
+        return SalesService(db).import_invoice_csv(
+            tenant_id=ctx.tenant_id,
+            csv_bytes=await file.read(),
+            performed_by_user_id=ctx.user_id,
+        )
+    except Exception as exc:
+        from app.core.exceptions import AppError, ValidationError
+        db.rollback()
+        if isinstance(exc, AppError):
+            raise
+        raise ValidationError(f"Sales CSV import failed: {exc}") from exc
 
 
 @router.get("/bills/{bill_id}", response_model=SaleBillResponse)
