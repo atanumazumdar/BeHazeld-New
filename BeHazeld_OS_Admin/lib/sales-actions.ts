@@ -2,7 +2,7 @@
 
 import { cookies } from 'next/headers';
 
-import type { SalesInvoiceImportResponse } from '@/types/sales';
+import type { SaleBillResponse, SalesInvoiceImportResponse } from '@/types/sales';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 const ACCESS_MAX_AGE = 30 * 60;
@@ -129,4 +129,68 @@ export async function importSalesInvoicesAction(
     success: true,
     data: (await response.json()) as SalesInvoiceImportResponse,
   };
+}
+
+interface BillFilters {
+  skip?: number;
+  limit?: number;
+  customer_id?: string;
+  date_from?: string;
+  date_to?: string;
+}
+
+async function getSalesData<T>(
+  path: string,
+  fallback: string,
+): Promise<SalesActionResult<T>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(path, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, fallback),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as T,
+  };
+}
+
+export async function listSalesBillsAction(
+  filters: BillFilters = {},
+): Promise<SalesActionResult<SaleBillResponse[]>> {
+  const params = new URLSearchParams();
+  if (filters.skip !== undefined) params.set('skip', String(filters.skip));
+  if (filters.limit !== undefined) params.set('limit', String(filters.limit));
+  if (filters.customer_id) params.set('customer_id', filters.customer_id);
+  if (filters.date_from) params.set('date_from', filters.date_from);
+  if (filters.date_to) params.set('date_to', filters.date_to);
+  const qs = params.toString();
+  return getSalesData<SaleBillResponse[]>(
+    `/api/v1/sales/bills${qs ? `?${qs}` : ''}`,
+    'Failed to load sales history.',
+  );
+}
+
+export async function getSalesBillAction(
+  billId: string,
+): Promise<SalesActionResult<SaleBillResponse>> {
+  return getSalesData<SaleBillResponse>(
+    `/api/v1/sales/bills/${billId}`,
+    'Failed to load sale bill.',
+  );
 }

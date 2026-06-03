@@ -12,7 +12,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { importSalesInvoicesAction } from '@/lib/sales-actions';
+import { getSalesBillAction, importSalesInvoicesAction, listSalesBillsAction } from '@/lib/sales-actions';
 import type {
   CreateCustomerPayload,
   CreateSaleBillPayload,
@@ -22,6 +22,25 @@ import type {
 } from '@/types/sales';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+
+interface ActionResult<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
+
+function requireActionData<T>(
+  result: ActionResult<T> | undefined,
+  fallbackMessage: string,
+): T {
+  if (!result) {
+    throw new Error('No response from the server. Please refresh and try again.');
+  }
+  if (!result.success || !result.data) {
+    throw new Error(result.message ?? fallbackMessage);
+  }
+  return result.data;
+}
 
 // ── Query keys ────────────────────────────────────────────────────────────────
 
@@ -63,19 +82,23 @@ export function useBills(filters: BillFilters = {}) {
   if (filters.customer_id) params.set('customer_id', filters.customer_id);
   if (filters.date_from) params.set('date_from', filters.date_from);
   if (filters.date_to) params.set('date_to', filters.date_to);
-  const qs = params.toString();
 
   return useQuery({
     queryKey: salesKeys.bills(Object.fromEntries(params)),
-    queryFn: () =>
-      apiClient.get<SaleBillResponse[]>(`/api/v1/sales/bills${qs ? `?${qs}` : ''}`),
+    queryFn: async () => {
+      const result = await listSalesBillsAction(filters);
+      return requireActionData(result, 'Failed to load sales history.');
+    },
   });
 }
 
 export function useBill(billId: string) {
   return useQuery({
     queryKey: salesKeys.bill(billId),
-    queryFn: () => apiClient.get<SaleBillResponse>(`/api/v1/sales/bills/${billId}`),
+    queryFn: async () => {
+      const result = await getSalesBillAction(billId);
+      return requireActionData(result, 'Failed to load sale bill.');
+    },
     enabled: Boolean(billId),
   });
 }
