@@ -61,6 +61,7 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, StockNotAvailableError, ValidationError
 from app.db.base import Base
+from app.models.catalog import Color, Product, ProductVariant, Size
 from app.models.inventory import Bin, MovementType
 from app.models.sales import Customer, SaleBill, SaleBillLine, SalePayment
 from app.models.tenant import Location
@@ -402,7 +403,7 @@ class SalesService:
 
                 for row in rows:
                     sku_code = row.get("sku_code", "")
-                    variant = self.catalog_repo.get_variant_by_sku(tenant_id, sku_code)
+                    variant = self._resolve_import_variant(tenant_id, sku_code)
                     if variant is None:
                         raise ValidationError(f"SKU '{sku_code}' not found")
 
@@ -506,6 +507,106 @@ class SalesService:
             return existing[0].id
         customer = self.repo.create_customer(tenant_id=tenant_id, name=name)
         return customer.id
+
+    def _resolve_import_variant(
+        self,
+        tenant_id: uuid.UUID,
+        sku_code: str,
+    ) -> ProductVariant | None:
+        exact = self.catalog_repo.get_variant_by_sku(tenant_id, sku_code)
+        if exact is not None:
+            return exact
+
+        exact_ci = self.db.scalar(
+            select(ProductVariant).where(
+                ProductVariant.tenant_id == tenant_id,
+                ProductVariant.status == "active",
+                ProductVariant.sku_code.ilike(sku_code),
+            )
+        )
+        if exact_ci is not None:
+            return exact_ci
+
+        parts = [part for part in sku_code.strip().upper().split("-") if part]
+        if len(parts) < 3:
+            return None
+
+        size_token = parts[-2]
+        color_token = parts[-1]
+        product_prefix = parts[0]
+
+        candidates = list(
+            self.db.scalars(
+                select(ProductVariant)
+                .join(Size, ProductVariant.size_id == Size.id)
+                .join(Color, ProductVariant.color_id == Color.id)
+                .join(Product, ProductVariant.product_id == Product.id)
+                .where(
+                    ProductVariant.tenant_id == tenant_id,
+                    ProductVariant.status == "active",
+                    Size.tenant_id == tenant_id,
+                    Color.tenant_id == tenant_id,
+                    Product.tenant_id == tenant_id,
+                    Product.status == "active",
+                )
+                .order_by(Product.product_code, ProductVariant.sku_code)
+            )
+        )
+
+        matches = [
+            variant for variant in candidates
+            if self._normalise_code(variant.size.name) == self._normalise_code(size_token)
+            and self._color_token_matches(color_token, variant.color.name)
+        ]
+        if not matches:
+            return None
+
+        prefix_matches = [
+            variant for variant in matches
+            if self._normalise_code(variant.product.product_code).startswith(product_prefix)
+        ]
+        if len(prefix_matches) == 1:
+            return prefix_matches[0]
+        if len(matches) == 1:
+            return matches[0]
+        raise ValidationError(
+            f"SKU '{sku_code}' matched multiple catalog variants: "
+            + ", ".join(variant.sku_code for variant in matches[:5])
+        )
+
+    @staticmethod
+    def _normalise_code(value: str) -> str:
+        return "".join(ch for ch in value.strip().upper() if ch.isalnum())
+
+    @classmethod
+    def _color_token_matches(cls, token: str, color_name: str) -> bool:
+        token_norm = cls._normalise_code(token)
+        color_norm = cls._normalise_code(color_name)
+        aliases = {
+            "GLD": "GOLD",
+            "GLDN": "GOLDEN",
+            "GOLD": "GOLDEN",
+            "SLV": "SILVER",
+            "SLVR": "SILVER",
+            "GRN": "GREEN",
+            "LNDR": "LAVENDER",
+            "LAV": "LAVENDER",
+            "YLW": "YELLOW",
+            "WHT": "WHITE",
+            "BLK": "BLACK",
+            "PCH": "PEACH",
+        }
+        expanded = aliases.get(token_norm, token_norm)
+        color_without_vowels = color_norm[:1] + "".join(
+            ch for ch in color_norm[1:] if ch not in {"A", "E", "I", "O", "U"}
+        )
+        possible = {
+            color_norm,
+            color_norm[:3],
+            color_without_vowels,
+            color_without_vowels[:3],
+        }
+        return expanded in possible or token_norm in possible or color_norm.startswith(expanded)
 
     @staticmethod
     def _norm_header(value: str | None) -> str:
