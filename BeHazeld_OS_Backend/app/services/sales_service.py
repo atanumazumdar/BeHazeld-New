@@ -56,12 +56,13 @@ from datetime import date
 from decimal import Decimal
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError, StockNotAvailableError, ValidationError
+from app.db.base import Base
 from app.models.inventory import Bin, MovementType
-from app.models.sales import Customer, SaleBill, SalePayment
+from app.models.sales import Customer, SaleBill, SaleBillLine, SalePayment
 from app.models.tenant import Location
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.inventory_repository import InventoryRepository
@@ -87,11 +88,32 @@ class SalesService:
         self.catalog_repo = CatalogRepository(db)
         self._finance_svc = None   # injected lazily; None → skip journal posting
 
+    def ensure_sales_tables_available(self) -> None:
+        """Create sales schema tables on first-run production databases."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS sales"))
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                Customer.__table__,
+                SaleBill.__table__,
+                SaleBillLine.__table__,
+                SalePayment.__table__,
+            ],
+        )
+
     # ── Customer management ───────────────────────────────────────────────────
 
     def create_customer(
         self, tenant_id: uuid.UUID, req: CreateCustomerRequest
     ) -> Customer:
+        self.ensure_sales_tables_available()
         try:
             c = self.repo.create_customer(
                 tenant_id=tenant_id,
@@ -110,9 +132,11 @@ class SalesService:
     def list_customers(
         self, tenant_id: uuid.UUID, search: Optional[str] = None
     ) -> list[Customer]:
+        self.ensure_sales_tables_available()
         return self.repo.list_customers(tenant_id, search=search)
 
     def get_customer(self, tenant_id: uuid.UUID, customer_id: uuid.UUID) -> Customer:
+        self.ensure_sales_tables_available()
         return self.repo.get_customer_by_id(tenant_id, customer_id)
 
     # ── The main sales transaction ────────────────────────────────────────────
@@ -140,6 +164,7 @@ class SalesService:
         ConflictError           — duplicate invoice number (shouldn't happen;
                                   sequence is tenant-monotonic)
         """
+        self.ensure_sales_tables_available()
         try:
             # ── Phase 1a: validate customer ───────────────────────────────────
             if req.customer_id is not None:
@@ -322,6 +347,7 @@ class SalesService:
         Optional columns:
         payment_mode,tax_rate,discount_amount,notes,transaction_id
         """
+        self.ensure_sales_tables_available()
         InventoryService(self.db).ensure_inventory_tables_available()
         location, bin_obj = self._default_sale_location_bin(tenant_id)
 
@@ -520,6 +546,7 @@ class SalesService:
     # ── Bill reads ────────────────────────────────────────────────────────────
 
     def get_bill(self, tenant_id: uuid.UUID, bill_id: uuid.UUID) -> SaleBill:
+        self.ensure_sales_tables_available()
         return self.repo.get_bill_by_id(tenant_id, bill_id)
 
     def list_bills(
@@ -531,6 +558,7 @@ class SalesService:
         date_from: Optional[date] = None,
         date_to: Optional[date] = None,
     ) -> list[SaleBill]:
+        self.ensure_sales_tables_available()
         return self.repo.list_bills(
             tenant_id,
             skip=skip,
@@ -547,6 +575,7 @@ class SalesService:
         Retrieve a persisted invoice PDF.  Regenerate on-the-fly if the file
         is missing (e.g. storage was wiped in dev).
         """
+        self.ensure_sales_tables_available()
         from pathlib import Path
         from app.core.config import settings
 
