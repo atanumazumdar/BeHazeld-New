@@ -197,11 +197,13 @@ class SalesService:
 
             # ── Phase 2a: compute totals ──────────────────────────────────────
             line_totals: list[Decimal] = []
+            line_unit_costs: list[Decimal] = []
             total_amount = Decimal("0")
             tax_amount = Decimal("0")
             total_discount = Decimal("0")
+            cost_amount = Decimal("0")
 
-            for line_req in req.lines:
+            for line_req, variant in zip(req.lines, variants):
                 net_price   = line_req.selling_price - line_req.discount_amount
                 line_total  = (line_req.quantity * net_price * (
                     1 + line_req.tax_rate
@@ -210,11 +212,15 @@ class SalesService:
                                ).quantize(Decimal("0.01"))
                 line_disc   = (line_req.quantity * line_req.discount_amount
                                ).quantize(Decimal("0.01"))
+                unit_cost = Decimal(str(variant.cost_price or 0)).quantize(Decimal("0.01"))
+                line_cost = (line_req.quantity * unit_cost).quantize(Decimal("0.01"))
 
                 line_totals.append(line_total)
+                line_unit_costs.append(unit_cost)
                 total_amount   += line_total
                 tax_amount     += line_tax
                 total_discount += line_disc
+                cost_amount    += line_cost
 
             # ── Phase 2b: generate invoice number ─────────────────────────────
             if invoice_number_override:
@@ -259,14 +265,14 @@ class SalesService:
             )
 
             # ── Phase 3b: lines + stock deduction ────────────────────────────
-            for line_req, line_total in zip(req.lines, line_totals):
+            for line_req, line_total, unit_cost in zip(req.lines, line_totals, line_unit_costs):
                 self.repo.create_bill_line(
                     tenant_id=tenant_id,
                     bill_id=bill.id,
                     product_variant_id=line_req.product_variant_id,
                     quantity=line_req.quantity,
                     selling_price=line_req.selling_price,
-                    unit_cost=Decimal("0"),   # Phase 5: populate from batch FIFO
+                    unit_cost=unit_cost,
                     tax_rate=line_req.tax_rate,
                     discount_amount=line_req.discount_amount,
                     total_line_amount=line_total,
@@ -279,7 +285,7 @@ class SalesService:
                     bin_id=req.bin_id,
                     movement_type=MovementType.SALE_OUT,
                     quantity_change=-line_req.quantity,   # negative: outward
-                    unit_cost=line_req.selling_price,
+                    unit_cost=unit_cost,
                     reference_type="sale_bill",
                     reference_id=bill.id,
                     notes=f"Sale invoice {invoice_number}",
@@ -311,6 +317,7 @@ class SalesService:
                     ref_id=bill.id,
                     entry_date=req.bill_date,
                     total_amount=total_amount,
+                    cost_amount=cost_amount,
                 )
 
             # ── Phase 3d: single commit ───────────────────────────────────────

@@ -127,8 +127,12 @@ export default function DashboardPage() {
   const { data: gst, isLoading: gstLoading } = useGstSummary();
   const { data: lowStock = [], isLoading: lowStockLoading } = useLowStock();
 
-  const grossProfit = pl ? parseFloat(pl.gross_profit) : undefined;
-  const netProfit = pl ? parseFloat(pl.net_profit) : undefined;
+  const grossProfit = metrics ? parseFloat(metrics.gross_profit) : undefined;
+  const operatingExpenses = pl ? parseFloat(pl.total_expenses) : undefined;
+  const netProfit =
+    grossProfit === undefined || operatingExpenses === undefined
+      ? undefined
+      : grossProfit - operatingExpenses;
   const grossProfitSentiment =
     grossProfit === undefined ? 'neutral' : grossProfit >= 0 ? 'positive' : 'negative';
   const netProfitSentiment =
@@ -149,29 +153,37 @@ export default function DashboardPage() {
       </div>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KpiCard
           title="Total Revenue"
-          value={pl ? fmt(pl.total_revenue) : '—'}
-          subtext="Income accounts"
+          value={metrics ? fmt(metrics.total_revenue) : '—'}
+          subtext="Confirmed sales"
           icon={TrendingUp}
-          loading={plLoading}
+          loading={metricsLoading}
           sentiment="positive"
         />
         <KpiCard
+          title="COGS"
+          value={metrics ? fmt(metrics.total_cogs) : '—'}
+          subtext="Cost of sold SKUs"
+          icon={TrendingDown}
+          loading={metricsLoading}
+          sentiment="neutral"
+        />
+        <KpiCard
           title="Gross Profit"
-          value={pl ? fmt(pl.gross_profit) : '—'}
+          value={metrics ? fmt(metrics.gross_profit) : '—'}
           subtext="Revenue − COGS"
           icon={TrendingUp}
-          loading={plLoading}
+          loading={metricsLoading}
           sentiment={grossProfitSentiment}
         />
         <KpiCard
           title="Net Profit"
-          value={pl ? fmt(pl.net_profit) : '—'}
+          value={netProfit === undefined ? '—' : fmt(netProfit)}
           subtext="Gross Profit − Expenses"
           icon={netProfit !== undefined && netProfit < 0 ? TrendingDown : TrendingUp}
-          loading={plLoading}
+          loading={metricsLoading || plLoading}
           sentiment={netProfitSentiment}
         />
         <KpiCard

@@ -73,6 +73,38 @@ class ReportRepository:
             stmt = stmt.where(PurchaseBill.bill_date <= to_date)
         return Decimal(str(self.db.execute(stmt).scalar_one()))
 
+    def get_total_cogs(
+        self,
+        tenant_id: uuid.UUID,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> Decimal:
+        """
+        SUM(quantity * unit cost) for confirmed sale lines.
+
+        Older sale rows may have unit_cost saved as 0, so fall back to the
+        current variant cost_price for dashboard reporting.
+        """
+        cost_expr = func.coalesce(
+            func.nullif(SaleBillLine.unit_cost, 0),
+            ProductVariant.cost_price,
+            0,
+        )
+        stmt = (
+            select(func.coalesce(func.sum(SaleBillLine.quantity * cost_expr), 0))
+            .join(SaleBill, SaleBillLine.bill_id == SaleBill.id)
+            .join(ProductVariant, SaleBillLine.product_variant_id == ProductVariant.id)
+            .where(
+                SaleBill.tenant_id == tenant_id,
+                SaleBill.status == "confirmed",
+            )
+        )
+        if from_date:
+            stmt = stmt.where(SaleBill.bill_date >= from_date)
+        if to_date:
+            stmt = stmt.where(SaleBill.bill_date <= to_date)
+        return Decimal(str(self.db.execute(stmt).scalar_one()))
+
     # ── Tax (GST) ─────────────────────────────────────────────────────────────
 
     def get_gst_summary(
