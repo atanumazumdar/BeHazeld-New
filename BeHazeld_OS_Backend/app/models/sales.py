@@ -46,6 +46,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.catalog import ProductVariant
 
 _SCHEMA = "sales"
 _AMT = Numeric(14, 2)
@@ -223,6 +224,7 @@ class SaleBillLine(Base):
     total_line_amount: Mapped[Decimal] = mapped_column(_AMT, nullable=False)
 
     bill: Mapped[SaleBill] = relationship(back_populates="lines")
+    variant: Mapped[ProductVariant] = relationship()
 
     def __repr__(self) -> str:
         return (

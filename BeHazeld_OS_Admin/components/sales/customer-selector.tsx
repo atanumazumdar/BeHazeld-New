@@ -35,6 +35,7 @@ export function CustomerSelector({ value, onChange }: CustomerSelectorProps) {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +71,7 @@ export function CustomerSelector({ value, onChange }: CustomerSelectorProps) {
       const created = await createCustomer.mutateAsync({
         name: newName.trim(),
         phone: newPhone.trim() || null,
-        email: null,
+        email: newEmail.trim() || null,
         address: null,
       });
       toast.success(`Customer "${created.name}" created.`);
@@ -79,6 +80,7 @@ export function CustomerSelector({ value, onChange }: CustomerSelectorProps) {
       setShowDropdown(false);
       setNewName('');
       setNewPhone('');
+      setNewEmail('');
     } catch (err) {
       const msg = err instanceof ApiError ? err.message : 'Failed to create customer.';
       toast.error(msg);
@@ -202,6 +204,15 @@ export function CustomerSelector({ value, onChange }: CustomerSelectorProps) {
                 className="h-8 text-sm bg-white"
               />
             </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Email</Label>
+            <Input
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              placeholder="customer@email.com"
+              className="h-8 text-sm bg-white"
+            />
           </div>
           <div className="flex justify-end gap-2">
             <Button

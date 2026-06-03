@@ -90,10 +90,10 @@ def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
     styles = getSampleStyleSheet()
     normal = styles["Normal"]
 
-    h1 = ParagraphStyle("H1", fontSize=22, textColor=_PRIMARY,
-                        spaceAfter=2, fontName="Helvetica-Bold")
+    h1 = ParagraphStyle("H1", fontSize=24, textColor=_PRIMARY,
+                        spaceAfter=2, fontName="Helvetica-Bold", alignment=TA_CENTER)
     h2 = ParagraphStyle("H2", fontSize=10, textColor=_GREY,
-                        fontName="Helvetica")
+                        fontName="Helvetica", alignment=TA_CENTER)
     label = ParagraphStyle("Label", fontSize=8, textColor=_GREY,
                            fontName="Helvetica")
     value = ParagraphStyle("Value", fontSize=10, textColor=_PRIMARY,
@@ -108,44 +108,32 @@ def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
     story: list = []
 
     # ── Header ─────────────────────────────────────────────────────────────────
-    header_data = [
-        [
-            Paragraph(f"<b>{tenant_name}</b>", h1),
-            Paragraph("INVOICE", ParagraphStyle(
-                "INV", fontSize=28, textColor=_ACCENT,
-                fontName="Helvetica-Bold", alignment=TA_RIGHT,
-            )),
-        ]
-    ]
-    header_tbl = Table(header_data, colWidths=[(_PAGE_W - 2 * _MARGIN) * 0.6,
-                                                (_PAGE_W - 2 * _MARGIN) * 0.4])
-    header_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    story.append(header_tbl)
-    story.append(HRFlowable(width="100%", thickness=2, color=_ACCENT, spaceAfter=6))
+    story.append(Paragraph("BeHazel'd", h1))
+    story.append(Paragraph("be you, with HAZEL", h2))
+    story.append(Spacer(1, 3 * mm))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=_ACCENT, spaceAfter=8))
 
     # ── Invoice meta ───────────────────────────────────────────────────────────
     invoice_no = getattr(bill, "invoice_number", "—")
     bill_date  = getattr(bill, "bill_date", "—")
     customer   = getattr(bill, "customer", None)
     cust_name  = customer.name if customer else "Walk-in Customer"
+    cust_phone = getattr(customer, "phone", None) if customer else None
 
     meta_data = [
         [
-            Paragraph("<b>Invoice #</b>", label),
+            Paragraph("<b>Name</b>", label),
+            Paragraph(cust_name, value),
+            "",
+            Paragraph("<b>Phone Number</b>", label),
+            Paragraph(str(cust_phone or "—"), value),
+        ],
+        [
+            Paragraph("<b>Inv No</b>", label),
             Paragraph(str(invoice_no), value),
             "",
             Paragraph("<b>Date</b>", label),
             Paragraph(str(bill_date), value),
-        ],
-        [
-            Paragraph("<b>Customer</b>", label),
-            Paragraph(cust_name, value),
-            "",
-            Paragraph("<b>Status</b>", label),
-            Paragraph(str(getattr(bill, "status", "confirmed")).upper(), value),
         ],
     ]
     usable_w = _PAGE_W - 2 * _MARGIN
@@ -163,35 +151,30 @@ def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
     story.append(Spacer(1, 4 * mm))
 
     # ── Line items table ───────────────────────────────────────────────────────
-    col_headers = ["#", "SKU / Variant", "Qty", "Price", "Disc", "Tax%", "Amount"]
+    col_headers = ["Item Description", "Quantity", "Price", "Total"]
     tbl_data = [col_headers]
 
     lines = getattr(bill, "lines", []) or []
-    for i, line in enumerate(lines, 1):
-        variant_id = str(getattr(line, "product_variant_id", ""))[:8] + "…"
+    for line in lines:
+        variant = getattr(line, "variant", None)
+        sku = getattr(variant, "sku_code", None) or str(getattr(line, "product_variant_id", ""))[:8]
+        product = getattr(variant, "product", None)
+        product_name = getattr(product, "name", None) or "Product"
         qty        = getattr(line, "quantity", 0)
         price      = getattr(line, "selling_price", 0)
-        disc       = getattr(line, "discount_amount", 0)
-        tax_r      = float(getattr(line, "tax_rate", 0)) * 100
         total      = getattr(line, "total_line_amount", 0)
         tbl_data.append([
-            str(i),
-            variant_id,
+            Paragraph(f"{product_name}<br/><font size='7'>{sku}</font>", normal),
             f"{qty:g}",
             f"₹{price:,.2f}",
-            f"₹{disc:,.2f}",
-            f"{tax_r:.0f}%",
             f"₹{total:,.2f}",
         ])
 
     col_ws = [
-        usable_w * 0.05,
-        usable_w * 0.30,
-        usable_w * 0.08,
+        usable_w * 0.52,
         usable_w * 0.14,
-        usable_w * 0.10,
-        usable_w * 0.09,
-        usable_w * 0.14,
+        usable_w * 0.17,
+        usable_w * 0.17,
     ]
     items_tbl = Table(tbl_data, colWidths=col_ws, repeatRows=1)
     items_tbl.setStyle(TableStyle([
@@ -207,8 +190,7 @@ def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
         ("FONTNAME",   (0, 1), (-1, -1), "Helvetica"),
         ("FONTSIZE",   (0, 1), (-1, -1), 8),
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [_WHITE, _LIGHT_BG]),
-        ("ALIGN",      (2, 1), (-1, -1), "RIGHT"),
-        ("ALIGN",      (0, 1), (0, -1), "CENTER"),
+        ("ALIGN",      (1, 1), (-1, -1), "RIGHT"),
         ("TOPPADDING",    (0, 1), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
         # Grid
@@ -273,8 +255,17 @@ def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
     story.append(Spacer(1, 6 * mm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=_GREY))
     story.append(Spacer(1, 2 * mm))
+    story.append(Paragraph("Thank You !!", ParagraphStyle(
+        "Thanks", fontSize=15, textColor=_ACCENT,
+        alignment=TA_CENTER, fontName="Helvetica-Bold",
+    )))
+    story.append(Spacer(1, 2 * mm))
     story.append(Paragraph(
-        "Thank you for your purchase! This is a computer-generated invoice.",
+        "You didn’t just shop — you made a statement.<br/>"
+        "Welcome to the world of refined simplicity. Stay stylish. Stay BeHAZEL’d.<br/>"
+        "With Love – Hazel<br/>"
+        "Visit our Website – www.behazeld.com<br/>"
+        "Stay connected - @behazeld",
         ParagraphStyle("Footer", fontSize=7, textColor=_GREY,
                        alignment=TA_CENTER, fontName="Helvetica-Oblique"),
     ))

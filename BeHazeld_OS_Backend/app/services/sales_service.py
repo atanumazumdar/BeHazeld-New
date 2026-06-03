@@ -168,8 +168,9 @@ class SalesService:
         self.ensure_sales_tables_available()
         try:
             # ── Phase 1a: validate customer ───────────────────────────────────
+            customer = None
             if req.customer_id is not None:
-                self.repo.get_customer_by_id(tenant_id, req.customer_id)
+                customer = self.repo.get_customer_by_id(tenant_id, req.customer_id)
 
             # ── Phase 1b: validate all variants ──────────────────────────────
             variants = []
@@ -230,11 +231,8 @@ class SalesService:
             bill_proxy = _BillProxy(
                 invoice_number=invoice_number,
                 bill_date=req.bill_date,
-                customer_name=(
-                    self.repo.get_customer_by_id(tenant_id, req.customer_id).name
-                    if req.customer_id else None
-                ),
-                lines_data=[(lr, lt) for lr, lt in zip(req.lines, line_totals)],
+                customer=customer,
+                lines_data=[(lr, lt, v) for lr, lt, v in zip(req.lines, line_totals, variants)],
                 total_amount=total_amount,
                 tax_amount=tax_amount,
                 total_discount=total_discount,
@@ -737,13 +735,14 @@ class SalesService:
 
 class _LineProxy:
     """Duck-typed SaleBillLine for the PDF renderer (used before DB flush)."""
-    def __init__(self, line_req, total: Decimal) -> None:
+    def __init__(self, line_req, total: Decimal, variant=None) -> None:
         self.product_variant_id = line_req.product_variant_id
         self.quantity           = line_req.quantity
         self.selling_price      = line_req.selling_price
         self.discount_amount    = line_req.discount_amount
         self.tax_rate           = line_req.tax_rate
         self.total_line_amount  = total
+        self.variant            = variant
 
 
 class _PaymentProxy:
@@ -754,8 +753,9 @@ class _PaymentProxy:
 
 
 class _CustomerProxy:
-    def __init__(self, name: str | None) -> None:
+    def __init__(self, name: str | None, phone: str | None = None) -> None:
         self.name = name or "Walk-in Customer"
+        self.phone = phone
 
 
 class _BillProxy:
@@ -764,7 +764,7 @@ class _BillProxy:
         self,
         invoice_number: str,
         bill_date,
-        customer_name: str | None,
+        customer,
         lines_data: list,
         total_amount: Decimal,
         tax_amount: Decimal,
@@ -774,8 +774,8 @@ class _BillProxy:
         self.invoice_number = invoice_number
         self.bill_date      = bill_date
         self.status         = "confirmed"
-        self.customer       = _CustomerProxy(customer_name) if customer_name else None
-        self.lines          = [_LineProxy(lr, lt) for lr, lt in lines_data]
+        self.customer       = _CustomerProxy(customer.name, customer.phone) if customer else None
+        self.lines          = [_LineProxy(lr, lt, v) for lr, lt, v in lines_data]
         self.payments       = [_PaymentProxy(payment)]
         self.total_amount   = total_amount
         self.tax_amount     = tax_amount

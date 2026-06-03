@@ -18,6 +18,7 @@
  */
 
 import { useState, useMemo } from 'react';
+import { Mail, MessageCircle, ReceiptText } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -45,9 +46,8 @@ import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 
 const PAYMENT_MODES: { value: SalePaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
-  { value: 'upi', label: 'UPI' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
-  { value: 'cheque', label: 'Cheque' },
+  { value: 'upi', label: 'UPI' },
 ];
 
 function today(): string {
@@ -133,6 +133,9 @@ export default function SalesPOSPage() {
   // ── Post sale ─────────────────────────────────────────────────────────────
   const createSale = useCreateSale();
   const [postedBill, setPostedBill] = useState<{ id: string; invoiceNumber: string } | null>(null);
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  const [postedCustomer, setPostedCustomer] = useState<CustomerResponse | null>(null);
+  const [postedTotal, setPostedTotal] = useState('');
 
   const canPost =
     cart.length > 0 &&
@@ -172,6 +175,9 @@ export default function SalesPOSPage() {
 
       // Show invoice preview
       setPostedBill({ id: bill.id, invoiceNumber: bill.invoice_number });
+      setShowInvoicePreview(true);
+      setPostedCustomer(customer);
+      setPostedTotal(bill.total_amount);
 
       // Reset POS
       setCart([]);
@@ -189,6 +195,35 @@ export default function SalesPOSPage() {
         toast.error(msg);
       }
     }
+  };
+
+  const cleanPhone = (phone: string | null | undefined) => {
+    const digits = (phone ?? '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.length === 10) return `91${digits}`;
+    return digits;
+  };
+
+  const invoiceMessage = () =>
+    `Hi ${postedCustomer?.name ?? 'there'}, your BeHazel'd invoice ${postedBill?.invoiceNumber} for ₹${postedTotal} has been generated. Thank you for shopping with BeHazel'd.`;
+
+  const openWhatsApp = () => {
+    const phone = cleanPhone(postedCustomer?.phone);
+    if (!phone) {
+      toast.error('Add a customer phone number before sending on WhatsApp.');
+      return;
+    }
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(invoiceMessage())}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const openEmail = () => {
+    if (!postedCustomer?.email) {
+      toast.error('Add a customer email before sending by email.');
+      return;
+    }
+    const subject = `BeHazel'd Invoice ${postedBill?.invoiceNumber}`;
+    const body = `${invoiceMessage()}\n\nPlease find the downloaded invoice PDF attached.`;
+    window.location.href = `mailto:${postedCustomer.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -255,6 +290,18 @@ export default function SalesPOSPage() {
               Customer
             </h2>
             <CustomerSelector value={customer} onChange={setCustomer} />
+            {customer ? (
+              <div className="grid grid-cols-2 gap-2 text-xs text-stone-500">
+                <div>
+                  <span className="font-medium text-stone-600">Phone: </span>
+                  {customer.phone || 'Not added'}
+                </div>
+                <div>
+                  <span className="font-medium text-stone-600">Email: </span>
+                  {customer.email || 'Not added'}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {/* Variant search */}
@@ -372,8 +419,10 @@ export default function SalesPOSPage() {
                     return (
                       <li key={line.variantId} className="flex justify-between gap-2">
                         <span className="text-stone-600 truncate flex-1">
-                          {line.productName}
-                          <span className="text-stone-400 text-xs ml-1">×{line.quantity}</span>
+                          <span className="block truncate">{line.productName}</span>
+                          <span className="text-stone-400 text-xs font-mono">
+                            {line.skuCode} · ×{line.quantity}
+                          </span>
                         </span>
                         <span className="font-mono text-slate-700 shrink-0">₹{net.toFixed(2)}</span>
                       </li>
@@ -467,7 +516,10 @@ export default function SalesPOSPage() {
                     Posting…
                   </span>
                 ) : (
-                  '✓ Confirm & Post'
+                  <span className="flex items-center justify-center gap-2">
+                    <ReceiptText className="h-4 w-4" />
+                    Generate Invoice
+                  </span>
                 )}
               </Button>
 
@@ -482,12 +534,45 @@ export default function SalesPOSPage() {
       </div>
 
       {/* Invoice preview modal */}
-      {postedBill && (
+      {postedBill && showInvoicePreview && (
         <InvoicePreviewModal
           billId={postedBill.id}
           invoiceNumber={postedBill.invoiceNumber}
-          onClose={() => setPostedBill(null)}
+          onClose={() => setShowInvoicePreview(false)}
         />
+      )}
+
+      {postedBill && (
+        <div className="fixed bottom-4 right-4 z-40 w-[min(420px,calc(100vw-2rem))] rounded-lg border border-emerald-200 bg-white p-4 shadow-xl">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                Invoice {postedBill.invoiceNumber} generated
+              </p>
+              <p className="mt-1 text-xs text-stone-500">
+                Send the invoice message to the customer, then attach the downloaded PDF if needed.
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-stone-400 hover:text-stone-600"
+              onClick={() => setPostedBill(null)}
+              aria-label="Close delivery actions"
+            >
+              ×
+            </button>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" className="gap-2" onClick={openWhatsApp}>
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="gap-2" onClick={openEmail}>
+              <Mail className="h-4 w-4" />
+              Email
+            </Button>
+          </div>
+        </div>
       )}
     </>
   );
