@@ -562,7 +562,7 @@ class SalesService:
 
         matches = [
             variant for variant in candidates
-            if self._normalise_code(variant.size.name) == self._normalise_code(size_token)
+            if self._size_token_matches(size_token, variant.size.name)
             and self._color_token_matches(color_token, variant.color.name)
         ]
         if not matches:
@@ -603,6 +603,19 @@ class SalesService:
     @staticmethod
     def _normalise_code(value: str) -> str:
         return "".join(ch for ch in value.strip().upper() if ch.isalnum())
+
+    @classmethod
+    def _size_token_matches(cls, token: str, size_name: str) -> bool:
+        token_norm = cls._normalise_code(token)
+        size_norm = cls._normalise_code(size_name)
+        aliases = {
+            "0": "FREESIZE",
+            "FREE": "FREESIZE",
+            "FS": "FREESIZE",
+            "ONESIZE": "FREESIZE",
+        }
+        expanded = aliases.get(token_norm, token_norm)
+        return expanded == size_norm
 
     @classmethod
     def _color_token_matches(cls, token: str, color_name: str) -> bool:
