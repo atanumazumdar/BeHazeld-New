@@ -76,8 +76,8 @@ export default function SalesHistoryPage() {
 
   const downloadTemplate = () => {
     const csv = [
-      'invoice_number,bill_date,customer_name,sku_code,quantity,selling_price,payment_mode,tax_rate,discount_amount,notes',
-      '001,2026-01-19,Sumaiya Khan,AE-TCS-0-GLDN,1,4000,cash,0,0,Imported from invoice-001.pdf',
+      'invoice_number,bill_date,customer_name,sku_code,resolved_sku_code,quantity,selling_price,payment_mode,tax_rate,discount_amount,notes',
+      '001,2026-01-19,Sumaiya Khan,AE-TCS-0-GLDN,,1,4000,cash,0,0,Imported from invoice-001.pdf',
     ].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);

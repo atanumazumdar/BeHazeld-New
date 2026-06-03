@@ -346,7 +346,7 @@ class SalesService:
         invoice_number,bill_date,customer_name,sku_code,quantity,selling_price
 
         Optional columns:
-        payment_mode,tax_rate,discount_amount,notes,transaction_id
+        resolved_sku_code,payment_mode,tax_rate,discount_amount,notes,transaction_id
         """
         self.ensure_sales_tables_available()
         InventoryService(self.db).ensure_inventory_tables_available()
@@ -403,9 +403,11 @@ class SalesService:
 
                 for row in rows:
                     sku_code = row.get("sku_code", "")
-                    variant = self._resolve_import_variant(tenant_id, sku_code)
+                    resolved_sku_code = row.get("resolved_sku_code", "")
+                    lookup_sku = resolved_sku_code or sku_code
+                    variant = self._resolve_import_variant(tenant_id, lookup_sku)
                     if variant is None:
-                        raise ValidationError(f"SKU '{sku_code}' not found")
+                        raise ValidationError(f"SKU '{lookup_sku}' not found")
 
                     quantity = self._parse_decimal(row.get("quantity", ""), "quantity")
                     selling_price = self._parse_decimal(row.get("selling_price", ""), "selling_price")
