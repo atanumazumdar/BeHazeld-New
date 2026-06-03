@@ -515,26 +515,22 @@ class FinanceService:
         revenue   = self.repo.get_balance_by_account_type(
             tenant_id, AccountType.INCOME, from_date, to_date
         )
-        cogs_type = AccountType.EXPENSE   # We'll break it down below
-        # COGS and OpEx: get all expenses, differentiate by sub-type if needed.
-        # For now we aggregate all Expense accounts, COGS is the portion on 5000.
-        expenses  = self.repo.get_balance_by_account_type(
-            tenant_id, AccountType.EXPENSE, from_date, to_date
+        cogs = self.repo.get_balance_by_account_code(
+            tenant_id, _COA_COGS, from_date, to_date
         )
-        # Gross profit is not easily separated without sub-type info at this
-        # aggregation level, so we proxy: total_cogs = 0 here (report uses
-        # expenses as a whole).  The more granular breakdown would need
-        # a per-account query; included as a future Phase 5 item.
-        gross     = revenue - Decimal("0")  # placeholder gross = revenue - cogs
-        net       = revenue - expenses
+        operating_expenses = self.repo.get_balance_by_account_type_excluding_codes(
+            tenant_id, AccountType.EXPENSE, {_COA_COGS}, from_date, to_date
+        )
+        gross = revenue - cogs
+        net = gross - operating_expenses
 
         return ProfitAndLossReport(
             from_date=from_date,
             to_date=to_date,
             total_revenue=revenue,
-            total_cogs=expenses,    # all expense = COGS + OpEx (simplified)
-            gross_profit=revenue,   # simplified: gross = revenue (COGS inlined)
-            total_expenses=expenses,
+            total_cogs=cogs,
+            gross_profit=gross,
+            total_expenses=operating_expenses,
             net_profit=net,
         )
 

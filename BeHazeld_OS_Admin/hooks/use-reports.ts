@@ -25,6 +25,11 @@ import {
   listFinanceAccountsAction,
   listJournalEntriesAction,
 } from '@/lib/finance-actions';
+import {
+  getDashboardMetricsAction,
+  getGstSummaryAction,
+  getLowStockAction,
+} from '@/lib/report-actions';
 import type {
   AuditLogEntry,
   CreateJournalEntryPayload,
@@ -78,7 +83,10 @@ function requireActionData<T>(
 export function useDashboardMetrics() {
   return useQuery({
     queryKey: reportKeys.dashboardMetrics,
-    queryFn: () => apiClient.get<DashboardMetrics>('/api/v1/dashboard/metrics'),
+    queryFn: async () => {
+      const result = await getDashboardMetricsAction();
+      return requireActionData(result, 'Failed to load dashboard metrics.');
+    },
     staleTime: 60_000,        // refresh at most once per minute
     refetchInterval: 120_000, // background refresh every 2 min
   });
@@ -87,22 +95,22 @@ export function useDashboardMetrics() {
 export function useLowStock() {
   return useQuery({
     queryKey: reportKeys.lowStock,
-    queryFn: () => apiClient.get<LowStockItem[]>('/api/v1/reports/low-stock'),
+    queryFn: async () => {
+      const result = await getLowStockAction();
+      return requireActionData(result, 'Failed to load low stock report.');
+    },
     staleTime: 60_000,
     refetchInterval: 120_000,
   });
 }
 
 export function useGstSummary(fromDate?: string, toDate?: string) {
-  const params = new URLSearchParams();
-  if (fromDate) params.set('from_date', fromDate);
-  if (toDate) params.set('to_date', toDate);
-  const qs = params.toString();
-
   return useQuery({
     queryKey: reportKeys.gst(fromDate, toDate),
-    queryFn: () =>
-      apiClient.get<GstSummary>(`/api/v1/reports/gst${qs ? `?${qs}` : ''}`),
+    queryFn: async () => {
+      const result = await getGstSummaryAction(fromDate, toDate);
+      return requireActionData(result, 'Failed to load GST summary.');
+    },
   });
 }
 

@@ -310,3 +310,81 @@ class FinanceRepository:
         if account_type in (AccountType.ASSET, AccountType.EXPENSE):
             return dr - cr
         return cr - dr
+
+    def get_balance_by_account_code(
+        self,
+        tenant_id: uuid.UUID,
+        account_code: str,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> Decimal:
+        """
+        Return the net balance for one account code, optionally date-filtered.
+
+        This is used by P&L reporting to separate COGS from other expenses.
+        """
+        stmt = (
+            select(
+                ChartOfAccount.account_type,
+                func.coalesce(func.sum(JournalLine.debit_amount), 0).label("dr"),
+                func.coalesce(func.sum(JournalLine.credit_amount), 0).label("cr"),
+            )
+            .join(JournalEntry, JournalLine.journal_id == JournalEntry.id)
+            .join(ChartOfAccount, JournalLine.account_id == ChartOfAccount.id)
+            .where(
+                ChartOfAccount.tenant_id == tenant_id,
+                ChartOfAccount.account_code == account_code,
+            )
+            .group_by(ChartOfAccount.account_type)
+        )
+        if from_date is not None:
+            stmt = stmt.where(JournalEntry.entry_date >= from_date)
+        if to_date is not None:
+            stmt = stmt.where(JournalEntry.entry_date <= to_date)
+
+        row = self.db.execute(stmt).one_or_none()
+        if row is None:
+            return Decimal("0")
+
+        dr = Decimal(str(row.dr))
+        cr = Decimal(str(row.cr))
+        if row.account_type in (AccountType.ASSET, AccountType.EXPENSE):
+            return dr - cr
+        return cr - dr
+
+    def get_balance_by_account_type_excluding_codes(
+        self,
+        tenant_id: uuid.UUID,
+        account_type: str,
+        excluded_codes: set[str],
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> Decimal:
+        """
+        Return a net balance for an account type excluding specific account codes.
+        """
+        stmt = (
+            select(
+                func.coalesce(func.sum(JournalLine.debit_amount), 0).label("dr"),
+                func.coalesce(func.sum(JournalLine.credit_amount), 0).label("cr"),
+            )
+            .join(JournalEntry, JournalLine.journal_id == JournalEntry.id)
+            .join(ChartOfAccount, JournalLine.account_id == ChartOfAccount.id)
+            .where(
+                ChartOfAccount.tenant_id == tenant_id,
+                ChartOfAccount.account_type == account_type,
+                ChartOfAccount.account_code.notin_(excluded_codes),
+            )
+        )
+        if from_date is not None:
+            stmt = stmt.where(JournalEntry.entry_date >= from_date)
+        if to_date is not None:
+            stmt = stmt.where(JournalEntry.entry_date <= to_date)
+
+        row = self.db.execute(stmt).one()
+        dr = Decimal(str(row.dr))
+        cr = Decimal(str(row.cr))
+
+        if account_type in (AccountType.ASSET, AccountType.EXPENSE):
+            return dr - cr
+        return cr - dr

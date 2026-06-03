@@ -127,7 +127,10 @@ export default function DashboardPage() {
   const { data: gst, isLoading: gstLoading } = useGstSummary();
   const { data: lowStock = [], isLoading: lowStockLoading } = useLowStock();
 
+  const grossProfit = pl ? parseFloat(pl.gross_profit) : undefined;
   const netProfit = pl ? parseFloat(pl.net_profit) : undefined;
+  const grossProfitSentiment =
+    grossProfit === undefined ? 'neutral' : grossProfit >= 0 ? 'positive' : 'negative';
   const netProfitSentiment =
     netProfit === undefined ? 'neutral' : netProfit >= 0 ? 'positive' : 'negative';
 
@@ -149,23 +152,19 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         <KpiCard
           title="Total Revenue"
-          value={metrics ? fmt(metrics.total_revenue) : '—'}
-          subtext="All confirmed sales"
+          value={pl ? fmt(pl.total_revenue) : '—'}
+          subtext="Income accounts"
           icon={TrendingUp}
-          loading={metricsLoading}
+          loading={plLoading}
           sentiment="positive"
         />
         <KpiCard
           title="Gross Profit"
-          value={metrics ? fmt(metrics.gross_profit) : '—'}
+          value={pl ? fmt(pl.gross_profit) : '—'}
           subtext="Revenue − COGS"
           icon={TrendingUp}
-          loading={metricsLoading}
-          sentiment={
-            metrics
-              ? parseFloat(metrics.gross_profit) >= 0 ? 'positive' : 'negative'
-              : 'neutral'
-          }
+          loading={plLoading}
+          sentiment={grossProfitSentiment}
         />
         <KpiCard
           title="Net Profit"
@@ -178,7 +177,7 @@ export default function DashboardPage() {
         <KpiCard
           title="GST Payable"
           value={gst ? fmt(gst.net_gst_payable) : '—'}
-          subtext="Collected − ITC"
+          subtext="Tax Collected − Tax Paid"
           icon={Coins}
           loading={gstLoading}
           sentiment={gstSentiment}
@@ -199,11 +198,11 @@ export default function DashboardPage() {
           <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">
             Tax Collected (Sales)
           </p>
-          {metricsLoading ? (
+          {gstLoading ? (
             <Skeleton className="h-5 w-24" />
           ) : (
             <p className="text-base font-semibold text-slate-700 tabular-nums">
-              {fmt(metrics?.total_tax_collected)}
+              {fmt(gst?.sales_tax_collected)}
             </p>
           )}
         </div>

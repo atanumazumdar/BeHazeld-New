@@ -49,15 +49,14 @@ def get_dashboard_metrics(
     """
     repo = ReportRepository(db)
 
-    revenue  = repo.get_total_revenue(ctx.tenant_id)
-    cogs     = repo.get_total_purchase_cost(ctx.tenant_id)
+    pl = FinanceService(db).get_profit_and_loss(ctx.tenant_id)
     gst_data = repo.get_gst_summary(ctx.tenant_id)
     skus     = repo.count_active_skus(ctx.tenant_id)
 
     return DashboardMetrics(
-        total_revenue=revenue,
-        total_cogs=cogs,
-        gross_profit=revenue - cogs,
+        total_revenue=pl.total_revenue,
+        total_cogs=pl.total_cogs,
+        gross_profit=pl.gross_profit,
         total_tax_collected=gst_data["sales_tax_collected"],
         active_skus=skus,
     )
