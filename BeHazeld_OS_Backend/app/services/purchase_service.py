@@ -27,11 +27,13 @@ directly (same Session, same transaction) we control the single commit point.
 import uuid
 from decimal import Decimal
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import NotFoundError
+from app.db.base import Base
 from app.models.inventory import MovementType
-from app.models.purchase import PurchaseBill, Vendor, VendorPayment
+from app.models.purchase import PurchaseBill, PurchaseBillLine, Transporter, Vendor, VendorPayment
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.inventory_repository import InventoryRepository
 from app.repositories.purchase_repository import PurchaseRepository
@@ -51,9 +53,31 @@ class PurchaseService:
         self.catalog_repo = CatalogRepository(db)
         self._finance_svc = None   # injected lazily; None → skip journal posting
 
+    def ensure_purchase_tables_available(self) -> None:
+        """Create purchase schema tables on first-run production databases."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name != "postgresql":
+            return
+
+        with bind.begin() as conn:
+            conn.execute(text("CREATE SCHEMA IF NOT EXISTS purchase"))
+
+        Base.metadata.create_all(
+            bind=bind,
+            tables=[
+                Vendor.__table__,
+                Transporter.__table__,
+                PurchaseBill.__table__,
+                PurchaseBillLine.__table__,
+                VendorPayment.__table__,
+            ],
+        )
+
     # ── Vendor management ─────────────────────────────────────────────────────
 
     def create_vendor(self, tenant_id: uuid.UUID, req: CreateVendorRequest) -> Vendor:
+        self.ensure_purchase_tables_available()
         try:
             vendor = self.repo.create_vendor(
                 tenant_id=tenant_id,
@@ -72,9 +96,11 @@ class PurchaseService:
             raise
 
     def list_vendors(self, tenant_id: uuid.UUID) -> list[Vendor]:
+        self.ensure_purchase_tables_available()
         return self.repo.list_vendors(tenant_id)
 
     def create_transporter(self, tenant_id: uuid.UUID, req: CreateTransporterRequest):
+        self.ensure_purchase_tables_available()
         try:
             t = self.repo.create_transporter(
                 tenant_id=tenant_id,
@@ -108,6 +134,7 @@ class PurchaseService:
         On any exception the full transaction is rolled back: no bill, no
         ledger entries, no batch records, no balance changes are persisted.
         """
+        self.ensure_purchase_tables_available()
         try:
             # ── Step 1: validate vendor ───────────────────────────────────────
             self.repo.get_vendor_by_id(tenant_id, req.vendor_id)  # raises NotFoundError
@@ -221,11 +248,13 @@ class PurchaseService:
     # ── Bill reads ────────────────────────────────────────────────────────────
 
     def get_bill(self, tenant_id: uuid.UUID, bill_id: uuid.UUID) -> PurchaseBill:
+        self.ensure_purchase_tables_available()
         return self.repo.get_bill_by_id(tenant_id, bill_id)
 
     def list_bills(
         self, tenant_id: uuid.UUID, skip: int = 0, limit: int = 50
     ) -> list[PurchaseBill]:
+        self.ensure_purchase_tables_available()
         return self.repo.list_bills(tenant_id, skip=skip, limit=limit)
 
     # ── Payments ──────────────────────────────────────────────────────────────
@@ -233,6 +262,7 @@ class PurchaseService:
     def record_payment(
         self, tenant_id: uuid.UUID, req: RecordVendorPaymentRequest
     ) -> VendorPayment:
+        self.ensure_purchase_tables_available()
         try:
             # Validate bill belongs to tenant
             self.repo.get_bill_by_id(tenant_id, req.bill_id)  # raises NotFoundError
