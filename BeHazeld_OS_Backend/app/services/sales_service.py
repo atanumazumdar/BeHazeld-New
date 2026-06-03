@@ -346,7 +346,7 @@ class SalesService:
         invoice_number,bill_date,customer_name,sku_code,quantity,selling_price
 
         Optional columns:
-        resolved_sku_code,payment_mode,tax_rate,discount_amount,notes,transaction_id
+        product_name,resolved_sku_code,payment_mode,tax_rate,discount_amount,notes,transaction_id
         """
         self.ensure_sales_tables_available()
         InventoryService(self.db).ensure_inventory_tables_available()
@@ -405,7 +405,11 @@ class SalesService:
                     sku_code = row.get("sku_code", "")
                     resolved_sku_code = row.get("resolved_sku_code", "")
                     lookup_sku = resolved_sku_code or sku_code
-                    variant = self._resolve_import_variant(tenant_id, lookup_sku)
+                    variant = self._resolve_import_variant(
+                        tenant_id,
+                        lookup_sku,
+                        product_name=row.get("product_name", ""),
+                    )
                     if variant is None:
                         raise ValidationError(f"SKU '{lookup_sku}' not found")
 
@@ -514,6 +518,7 @@ class SalesService:
         self,
         tenant_id: uuid.UUID,
         sku_code: str,
+        product_name: str = "",
     ) -> ProductVariant | None:
         exact = self.catalog_repo.get_variant_by_sku(tenant_id, sku_code)
         if exact is not None:
@@ -562,6 +567,25 @@ class SalesService:
         ]
         if not matches:
             return None
+
+        product_name_norm = self._normalise_code(product_name)
+        if product_name_norm:
+            named_matches = [
+                variant for variant in matches
+                if self._normalise_code(variant.product.name) == product_name_norm
+            ]
+            if len(named_matches) == 1:
+                return named_matches[0]
+            if not named_matches:
+                named_matches = [
+                    variant for variant in matches
+                    if product_name_norm in self._normalise_code(variant.product.name)
+                    or self._normalise_code(variant.product.name) in product_name_norm
+                ]
+            if len(named_matches) == 1:
+                return named_matches[0]
+            if len(named_matches) > 1:
+                matches = named_matches
 
         prefix_matches = [
             variant for variant in matches
