@@ -103,6 +103,8 @@ export default function SalesHistoryPage() {
       } else {
         toast.success(base);
       }
+      setDateFrom('');
+      setDateTo('');
       setSkip(0);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to import sales invoices.';
