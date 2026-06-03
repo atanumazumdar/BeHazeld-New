@@ -13,6 +13,7 @@
  */
 
 import Link from 'next/link';
+import { useMemo } from 'react';
 import {
   TrendingUp,
   TrendingDown,
@@ -39,6 +40,8 @@ import {
   useLowStock,
   useProfitAndLoss,
 } from '@/hooks/use-reports';
+import { useProducts } from '@/hooks/use-catalog';
+import { useBills } from '@/hooks/use-sales';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -56,6 +59,12 @@ function fmt(value: string | number | undefined): string {
 function fmtNum(value: number | undefined): string {
   if (value === undefined) return '—';
   return value.toLocaleString('en-IN');
+}
+
+function num(value: string | number | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = typeof value === 'string' ? parseFloat(value) : value;
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
@@ -126,8 +135,60 @@ export default function DashboardPage() {
   const { data: pl, isLoading: plLoading } = useProfitAndLoss();
   const { data: gst, isLoading: gstLoading } = useGstSummary();
   const { data: lowStock = [], isLoading: lowStockLoading } = useLowStock();
+  const { data: salesBills = [], isLoading: salesLoading } = useBills({ limit: 1000 });
+  const { data: products = [], isLoading: productsLoading } = useProducts({
+    status: 'active',
+    limit: 1000,
+  });
 
-  const grossProfit = metrics ? parseFloat(metrics.gross_profit) : undefined;
+  const fallbackMetrics = useMemo(() => {
+    const variantCost = new Map<string, number>();
+    let activeSkus = 0;
+
+    for (const product of products) {
+      for (const variant of product.variants ?? []) {
+        if (variant.status !== 'active') continue;
+        activeSkus += 1;
+        variantCost.set(variant.id, num(variant.cost_price));
+      }
+    }
+
+    let totalRevenue = 0;
+    let totalTaxCollected = 0;
+    let totalCogs = 0;
+
+    for (const bill of salesBills) {
+      if (bill.status !== 'confirmed') continue;
+      totalRevenue += num(bill.total_amount);
+      totalTaxCollected += num(bill.tax_amount);
+
+      for (const line of bill.lines ?? []) {
+        const unitCost = num(line.unit_cost) || variantCost.get(line.product_variant_id) || 0;
+        totalCogs += num(line.quantity) * unitCost;
+      }
+    }
+
+    return {
+      totalRevenue,
+      totalTaxCollected,
+      totalCogs,
+      grossProfit: totalRevenue - totalCogs,
+      activeSkus,
+    };
+  }, [products, salesBills]);
+
+  const hasMetrics = Boolean(metrics);
+  const dashboardLoading = hasMetrics
+    ? false
+    : metricsLoading || salesLoading || productsLoading;
+  const totalRevenue = hasMetrics ? num(metrics?.total_revenue) : fallbackMetrics.totalRevenue;
+  const totalCogs = hasMetrics ? num(metrics?.total_cogs) : fallbackMetrics.totalCogs;
+  const grossProfit = hasMetrics ? num(metrics?.gross_profit) : fallbackMetrics.grossProfit;
+  const activeSkus = hasMetrics ? metrics?.active_skus : fallbackMetrics.activeSkus;
+  const taxCollected = gst ? num(gst.sales_tax_collected) : fallbackMetrics.totalTaxCollected;
+  const taxPaid = gst ? num(gst.purchase_tax_paid) : 0;
+  const gstPayable = gst ? num(gst.net_gst_payable) : taxCollected - taxPaid;
+
   const operatingExpenses = pl ? parseFloat(pl.total_expenses) : undefined;
   const netProfit =
     grossProfit === undefined || operatingExpenses === undefined
@@ -138,7 +199,6 @@ export default function DashboardPage() {
   const netProfitSentiment =
     netProfit === undefined ? 'neutral' : netProfit >= 0 ? 'positive' : 'negative';
 
-  const gstPayable = gst ? parseFloat(gst.net_gst_payable) : undefined;
   const gstSentiment =
     gstPayable === undefined ? 'neutral' : gstPayable <= 0 ? 'positive' : 'warning';
 
@@ -156,26 +216,26 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <KpiCard
           title="Total Revenue"
-          value={metrics ? fmt(metrics.total_revenue) : '—'}
+          value={dashboardLoading ? '—' : fmt(totalRevenue)}
           subtext="Confirmed sales"
           icon={TrendingUp}
-          loading={metricsLoading}
+          loading={dashboardLoading}
           sentiment="positive"
         />
         <KpiCard
           title="COGS"
-          value={metrics ? fmt(metrics.total_cogs) : '—'}
+          value={dashboardLoading ? '—' : fmt(totalCogs)}
           subtext="Cost of sold SKUs"
           icon={TrendingDown}
-          loading={metricsLoading}
+          loading={dashboardLoading}
           sentiment="neutral"
         />
         <KpiCard
           title="Gross Profit"
-          value={metrics ? fmt(metrics.gross_profit) : '—'}
+          value={dashboardLoading ? '—' : fmt(grossProfit)}
           subtext="Revenue − COGS"
           icon={TrendingUp}
-          loading={metricsLoading}
+          loading={dashboardLoading}
           sentiment={grossProfitSentiment}
         />
         <KpiCard
@@ -183,23 +243,23 @@ export default function DashboardPage() {
           value={netProfit === undefined ? '—' : fmt(netProfit)}
           subtext="Gross Profit − Expenses"
           icon={netProfit !== undefined && netProfit < 0 ? TrendingDown : TrendingUp}
-          loading={metricsLoading || plLoading}
+          loading={dashboardLoading || plLoading}
           sentiment={netProfitSentiment}
         />
         <KpiCard
           title="GST Payable"
-          value={gst ? fmt(gst.net_gst_payable) : '—'}
+          value={gstLoading || dashboardLoading ? '—' : fmt(gstPayable)}
           subtext="Tax Collected − Tax Paid"
           icon={Coins}
-          loading={gstLoading}
+          loading={gstLoading || dashboardLoading}
           sentiment={gstSentiment}
         />
         <KpiCard
           title="Active SKUs"
-          value={metrics ? fmtNum(metrics.active_skus) : '—'}
+          value={dashboardLoading ? '—' : fmtNum(activeSkus)}
           subtext={`${lowStock.length} below reorder`}
           icon={Package}
-          loading={metricsLoading}
+          loading={dashboardLoading}
           sentiment={lowStock.length > 0 ? 'warning' : 'neutral'}
         />
       </div>
@@ -210,11 +270,11 @@ export default function DashboardPage() {
           <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide mb-1">
             Tax Collected (Sales)
           </p>
-          {gstLoading ? (
+          {gstLoading || dashboardLoading ? (
             <Skeleton className="h-5 w-24" />
           ) : (
             <p className="text-base font-semibold text-slate-700 tabular-nums">
-              {fmt(gst?.sales_tax_collected)}
+              {fmt(taxCollected)}
             </p>
           )}
         </div>
@@ -226,7 +286,7 @@ export default function DashboardPage() {
             <Skeleton className="h-5 w-24" />
           ) : (
             <p className="text-base font-semibold text-slate-700 tabular-nums">
-              {fmt(gst?.purchase_tax_paid)}
+              {fmt(taxPaid)}
             </p>
           )}
         </div>
