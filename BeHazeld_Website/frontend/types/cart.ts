@@ -2,8 +2,8 @@ import type { Product, ProductVariant } from "@/types/product";
 
 // ── Cart item (persisted in localStorage via Zustand) ─────────────
 export type CartItem = {
-  productId: number;
-  variantId: number | null;   // null for legacy items added without variant
+  productId: string;
+  variantId: string | null;   // null for legacy items added without variant
   sku:       string;
   slug:      string;
   name:      string;

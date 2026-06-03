@@ -7,7 +7,7 @@ export type TransformUrls = {
 };
 
 export type ProductImage = {
-  id:             number;
+  id:             string;
   url:            string;
   alt_text:       string;
   display_order:  number;
@@ -17,7 +17,7 @@ export type ProductImage = {
 
 // ── Variant ────────────────────────────────────────────────────────
 export type ProductVariant = {
-  id:               number;
+  id:               string;
   sku:              string;
   color:            string;
   size:             string;
@@ -28,14 +28,14 @@ export type ProductVariant = {
 
 // ── Product (listing view — includes primary_image + variants) ─────
 export type Product = {
-  id:            number;
+  id:            string;
   name:          string;
   slug:          string;
   description:   string;
   base_price:    string;    // Decimal as string
   is_active:     boolean;
   created_at:    string;
-  collection_id: number | null;
+  collection_id: string | null;
 
   primary_image:   ProductImage | null;
   secondary_image: ProductImage | null;

@@ -1,7 +1,13 @@
 import type { Product, ProductDetail } from "@/types/product";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+import {
+  adaptProduct,
+  adaptProductDetail,
+  fetchPublicCategories,
+  fetchPublicProduct,
+  fetchPublicProducts,
+  productIdFromSlug,
+  slugify,
+} from "@/lib/os-catalog";
 
 export class ProductLoadError extends Error {
   constructor(message = "Unable to load products") {
@@ -18,19 +24,16 @@ export async function getProducts(
   collection?: string,
 ): Promise<Product[]> {
   try {
-    const url = collection
-      ? `${API_BASE_URL}/products/?collection=${encodeURIComponent(collection)}`
-      : `${API_BASE_URL}/products/`;
-
-    const res = await fetch(url, { next: { revalidate: 60 } });
-
-    if (!res.ok) {
-      throw new ProductLoadError(
-        `Unable to load products: API returned ${res.status}`,
-      );
+    let categoryId: string | undefined;
+    if (collection) {
+      const categories = await fetchPublicCategories();
+      const category = categories.find((item) => slugify(item.name) === collection);
+      if (!category) return [];
+      categoryId = category.id;
     }
 
-    return res.json();
+    const products = await fetchPublicProducts({ categoryId });
+    return products.map(adaptProduct);
   } catch (err) {
     if (err instanceof ProductLoadError) throw err;
     throw new ProductLoadError("Backend offline: unable to load products");
@@ -42,11 +45,11 @@ export async function getProducts(
  */
 export async function getProduct(slug: string): Promise<ProductDetail | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/products/${slug}`, {
-      next: { revalidate: 60 },
-    });
-    if (!res.ok) return null;
-    return res.json();
+    const productId = productIdFromSlug(slug);
+    if (!productId) return null;
+
+    const product = await fetchPublicProduct(productId);
+    return product ? adaptProductDetail(product) : null;
   } catch {
     return null;
   }

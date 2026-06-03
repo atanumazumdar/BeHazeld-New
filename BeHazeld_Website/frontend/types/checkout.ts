@@ -7,13 +7,13 @@ export type CheckoutPayload = {
   postal_code: string;
   country: string;
   items: {
-    product_id: number;
+    product_id: string;
     quantity: number;
   }[];
 };
 
 export type CheckoutOrder = {
-  id: number;
+  id: string;
   status: string;
   subtotal: string;
   shipping_total: string;

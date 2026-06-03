@@ -10,15 +10,15 @@ import { cardImageUrl, variantPrice } from "@/types/product";
 type CartState = {
   items: CartItem[];
   addItem:        (product: Product, variant: ProductVariant | null) => void;
-  removeItem:     (productId: number, variantId: number | null) => void;
-  updateQuantity: (productId: number, variantId: number | null, quantity: number) => void;
+  removeItem:     (productId: string, variantId: string | null) => void;
+  updateQuantity: (productId: string, variantId: string | null, quantity: number) => void;
   clearCart:      () => void;
   getItemCount:   () => number;
   getSubtotal:    () => number;
 };
 
 /** Unique key per cart line: productId + variantId */
-function lineKey(productId: number, variantId: number | null): string {
+function lineKey(productId: string, variantId: string | null): string {
   return `${productId}:${variantId ?? "no-variant"}`;
 }
 

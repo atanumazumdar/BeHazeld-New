@@ -2,7 +2,7 @@ import type { Product } from "@/types/product";
 
 // ── Collection (summary — for nav and listing) ─────────────────────
 export type Collection = {
-  id:            number;
+  id:            string;
   name:          string;
   slug:          string;
   description:   string;

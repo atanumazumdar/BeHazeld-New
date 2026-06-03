@@ -1,7 +1,11 @@
 import type { Collection, CollectionWithProducts } from "@/types/collection";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+import {
+  adaptCategory,
+  adaptProduct,
+  fetchPublicCategories,
+  fetchPublicProducts,
+  slugify,
+} from "@/lib/os-catalog";
 
 export class CollectionLoadError extends Error {
   constructor(message = "Unable to load collection") {
@@ -16,11 +20,8 @@ export class CollectionLoadError extends Error {
  */
 export async function getCollections(): Promise<Collection[]> {
   try {
-    const res = await fetch(`${API_BASE_URL}/collections/`, {
-      next: { revalidate: 60 },   // ISR — re-fetch at most once per minute
-    });
-    if (!res.ok) return [];
-    return res.json();
+    const categories = await fetchPublicCategories();
+    return categories.map(adaptCategory);
   } catch {
     return [];
   }
@@ -37,12 +38,15 @@ export async function getCollection(
   slug: string,
 ): Promise<CollectionWithProducts | null> {
   try {
-    const res = await fetch(`${API_BASE_URL}/collections/${slug}`, {
-      next: { revalidate: 60 },
-    });
-    if (res.status === 404) return null;
-    if (!res.ok) throw new CollectionLoadError(`API returned ${res.status}`);
-    return res.json();
+    const categories = await fetchPublicCategories();
+    const category = categories.find((item) => slugify(item.name) === slug);
+    if (!category) return null;
+
+    const products = await fetchPublicProducts({ categoryId: category.id });
+    return {
+      ...adaptCategory(category),
+      products: products.map(adaptProduct),
+    };
   } catch {
     return null;
   }
