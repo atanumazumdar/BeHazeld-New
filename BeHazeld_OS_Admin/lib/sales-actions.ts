@@ -2,7 +2,13 @@
 
 import { cookies } from 'next/headers';
 
-import type { SaleBillResponse, SalesInvoiceImportResponse } from '@/types/sales';
+import type {
+  CreateCustomerPayload,
+  CreateSaleBillPayload,
+  CustomerResponse,
+  SaleBillResponse,
+  SalesInvoiceImportResponse,
+} from '@/types/sales';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 const ACCESS_MAX_AGE = 30 * 60;
@@ -99,6 +105,74 @@ async function readErrorMessage(response: Response, fallback: string): Promise<s
     // ignore parse error
   }
   return `${fallback} (HTTP ${response.status})`;
+}
+
+async function authenticatedJsonRequest<T>(
+  path: string,
+  payload: unknown,
+  fallback: string,
+  method = 'POST',
+): Promise<SalesActionResult<T>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(path, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, fallback),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as T,
+  };
+}
+
+export async function listCustomersAction(
+  search = '',
+): Promise<SalesActionResult<CustomerResponse[]>> {
+  const params = new URLSearchParams();
+  if (search) params.set('search', search);
+
+  return getSalesData<CustomerResponse[]>(
+    `/api/v1/sales/customers${params.toString() ? `?${params.toString()}` : ''}`,
+    'Failed to load customers.',
+  );
+}
+
+export async function createCustomerAction(
+  payload: CreateCustomerPayload,
+): Promise<SalesActionResult<CustomerResponse>> {
+  return authenticatedJsonRequest<CustomerResponse>(
+    '/api/v1/sales/customers',
+    payload,
+    'Failed to create customer.',
+  );
+}
+
+export async function createSaleBillAction(
+  payload: CreateSaleBillPayload,
+): Promise<SalesActionResult<SaleBillResponse>> {
+  return authenticatedJsonRequest<SaleBillResponse>(
+    '/api/v1/sales/bills',
+    payload,
+    'Failed to post sale.',
+  );
 }
 
 export async function importSalesInvoicesAction(

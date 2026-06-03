@@ -25,13 +25,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 import { CustomerSelector } from '@/components/sales/customer-selector';
 import { VariantSearch } from '@/components/sales/variant-search';
@@ -49,6 +42,9 @@ const PAYMENT_MODES: { value: SalePaymentMode; label: string }[] = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'upi', label: 'UPI' },
 ];
+
+const selectClassName =
+  'h-10 w-full rounded-md border border-stone-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-400 disabled:bg-stone-50 disabled:text-stone-400';
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -248,38 +244,37 @@ export default function SalesPOSPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>Location *</Label>
-                <Select
-                  onValueChange={(v) => { setLocationId(v ?? ''); setBinId(''); }}
+                <select
+                  className={selectClassName}
                   value={locationId}
+                  onChange={(e) => {
+                    setLocationId(e.target.value);
+                    setBinId('');
+                  }}
                 >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder="Select location…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {locations.map((l) => (
-                      <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="">Select location...</option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="space-y-1.5">
                 <Label>Bin *</Label>
-                <Select
-                  onValueChange={(v) => setBinId(v ?? '')}
+                <select
+                  className={selectClassName}
                   value={binId}
                   disabled={!locationId}
+                  onChange={(e) => setBinId(e.target.value)}
                 >
-                  <SelectTrigger className="bg-white">
-                    <SelectValue placeholder={locationId ? 'Select bin…' : 'Choose location first'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {bins.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>
-                        {b.name}{b.is_default ? ' (default)' : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <option value="">{locationId ? 'Select bin...' : 'Choose location first'}</option>
+                  {bins.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}{b.is_default ? ' (default)' : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -459,19 +454,15 @@ export default function SalesPOSPage() {
 
                 <div className="space-y-1.5">
                   <Label className="text-xs">Mode</Label>
-                  <Select
-                    onValueChange={(v) => setPaymentMode((v ?? 'cash') as SalePaymentMode)}
+                  <select
+                    className={`${selectClassName} h-9`}
                     value={paymentMode}
+                    onChange={(e) => setPaymentMode(e.target.value as SalePaymentMode)}
                   >
-                    <SelectTrigger className="bg-white h-9 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_MODES.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {PAYMENT_MODES.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1.5">

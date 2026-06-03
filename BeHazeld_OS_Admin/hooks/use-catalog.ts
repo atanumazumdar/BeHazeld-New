@@ -8,7 +8,6 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
 import {
   createProductAction,
   createMasterDataAction,
@@ -17,6 +16,7 @@ import {
   deleteProductAction,
   getVariantAction,
   importMasterDataAction,
+  listProductVariantsAction,
   listProductsAction,
   listMasterDataAction,
   uploadVariantImageAction,
@@ -175,8 +175,10 @@ export function useProducts(filters: ProductFilters = {}) {
 export function useVariants(productId: string) {
   return useQuery({
     queryKey: catalogKeys.variants(productId),
-    queryFn: () =>
-      apiClient.get<ProductVariantResponse[]>(`/api/v1/catalog/products/${productId}/variants`),
+    queryFn: async () => {
+      const result = await listProductVariantsAction(productId);
+      return requireActionData(result, 'Failed to load variants.') as ProductVariantResponse[];
+    },
     enabled: Boolean(productId),
   });
 }

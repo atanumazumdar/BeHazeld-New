@@ -12,7 +12,14 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api-client';
-import { getSalesBillAction, importSalesInvoicesAction, listSalesBillsAction } from '@/lib/sales-actions';
+import {
+  createCustomerAction,
+  createSaleBillAction,
+  getSalesBillAction,
+  importSalesInvoicesAction,
+  listCustomersAction,
+  listSalesBillsAction,
+} from '@/lib/sales-actions';
 import type {
   CreateCustomerPayload,
   CreateSaleBillPayload,
@@ -57,10 +64,10 @@ export const salesKeys = {
 export function useCustomerSearch(search: string) {
   return useQuery({
     queryKey: salesKeys.customers(search),
-    queryFn: () =>
-      apiClient.get<CustomerResponse[]>(
-        `/api/v1/sales/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`,
-      ),
+    queryFn: async () => {
+      const result = await listCustomersAction(search);
+      return requireActionData(result, 'Failed to load customers.');
+    },
     staleTime: 10_000,
   });
 }
@@ -108,10 +115,12 @@ export function useBill(billId: string) {
 export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateCustomerPayload) =>
-      apiClient.post<CustomerResponse>('/api/v1/sales/customers', data),
+    mutationFn: async (data: CreateCustomerPayload) => {
+      const result = await createCustomerAction(data);
+      return requireActionData(result, 'Failed to create customer.');
+    },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: salesKeys.customers() });
+      qc.invalidateQueries({ queryKey: [...salesKeys.all, 'customers'] });
     },
   });
 }
@@ -119,8 +128,10 @@ export function useCreateCustomer() {
 export function useCreateSale() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: CreateSaleBillPayload) =>
-      apiClient.post<SaleBillResponse>('/api/v1/sales/bills', data),
+    mutationFn: async (data: CreateSaleBillPayload) => {
+      const result = await createSaleBillAction(data);
+      return requireActionData(result, 'Failed to post sale.');
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: salesKeys.all });
     },

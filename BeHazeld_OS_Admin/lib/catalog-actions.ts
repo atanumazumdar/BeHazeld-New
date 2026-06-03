@@ -413,6 +413,36 @@ export async function getVariantAction(
   };
 }
 
+export async function listProductVariantsAction(
+  productId: string,
+): Promise<CatalogActionResult<ProductVariantResponse[]>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/catalog/products/${productId}/variants`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load variants.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as ProductVariantResponse[],
+  };
+}
+
 export async function createProductAction(
   payload: CreateProductPayload,
 ): Promise<CatalogActionResult<ProductResponse>> {
