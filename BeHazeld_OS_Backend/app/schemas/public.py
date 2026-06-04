@@ -31,9 +31,17 @@ class PublicVariantResponse(BaseModel):
 
     id: uuid.UUID
     sku_code: str
+    size_id: uuid.UUID
+    size_name: str
+    color_id: uuid.UUID
+    color_name: str
+    color_hex_code: str | None
+    fabric: str | None
     image_url: str | None
     mrp: Decimal
     selling_price: Decimal
+    stock_count: Decimal
+    is_available: bool
     status: str
 
     @field_validator("image_url", mode="before")
@@ -50,6 +58,10 @@ class PublicProductResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
+    category_id: uuid.UUID | None
+    product_group_id: uuid.UUID | None
+    product_type_id: uuid.UUID | None
+    brand_id: uuid.UUID | None
     product_code: str
     name: str
     description: str | None

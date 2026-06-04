@@ -15,11 +15,13 @@ Design rules
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models.catalog import Category, Product, ProductVariant
+from app.models.inventory import StockBalance
 
 
 class PublicRepository:
@@ -97,6 +99,10 @@ class PublicRepository:
         """Return all active (non-deleted) variants for a given product."""
         stmt = (
             select(ProductVariant)
+            .options(
+                selectinload(ProductVariant.size),
+                selectinload(ProductVariant.color),
+            )
             .where(
                 ProductVariant.tenant_id == tenant_id,
                 ProductVariant.product_id == product_id,
@@ -105,6 +111,32 @@ class PublicRepository:
             .order_by(ProductVariant.sku_code)
         )
         return list(self.db.execute(stmt).scalars().all())
+
+    def available_stock_by_variant(
+        self,
+        tenant_id: uuid.UUID,
+        variant_ids: list[uuid.UUID],
+    ) -> dict[uuid.UUID, Decimal]:
+        """Return SUM(on_hand - reserved) by variant for public availability."""
+        if not variant_ids:
+            return {}
+
+        available_expr = StockBalance.quantity_on_hand - StockBalance.quantity_reserved
+        stmt = (
+            select(
+                StockBalance.product_variant_id,
+                func.coalesce(func.sum(available_expr), 0).label("available"),
+            )
+            .where(
+                StockBalance.tenant_id == tenant_id,
+                StockBalance.product_variant_id.in_(variant_ids),
+            )
+            .group_by(StockBalance.product_variant_id)
+        )
+        return {
+            row.product_variant_id: Decimal(str(row.available))
+            for row in self.db.execute(stmt).all()
+        }
 
     def count_active_skus(self, tenant_id: uuid.UUID) -> int:
         """Count of all active SKUs — used for the dashboard metric."""

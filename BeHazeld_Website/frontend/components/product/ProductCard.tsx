@@ -23,7 +23,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   );
 
   const isSoldOut    = product.total_stock === 0;
-  const imgUrl       = cardImg(product.primary_image);
+  const imgUrl       = selectedVariant?.image_url ?? cardImg(product.primary_image);
   const displayPrice = selectedVariant
     ? variantPrice(product, selectedVariant)
     : Number(product.min_price);
@@ -167,6 +167,19 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
                   background: color === activeColor ? "rgba(139,105,20,0.08)" : "transparent",
                 }}
               >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 7,
+                    height: 7,
+                    borderRadius: 999,
+                    marginRight: 4,
+                    verticalAlign: "-1px",
+                    background: product.variants.find((v) => v.color === color)?.color_hex_code ?? "transparent",
+                    border: "1px solid rgba(140,100,30,0.32)",
+                  }}
+                />
                 {color}
               </button>
             ))}

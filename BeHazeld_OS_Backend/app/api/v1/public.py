@@ -24,7 +24,7 @@ Performance notes
 """
 import uuid
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -42,6 +42,32 @@ from app.schemas.public import (
 router = APIRouter(prefix="/public", tags=["public"])
 
 
+def _mark_uncached(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+
+
+def _public_variant_response(v, stock_count) -> PublicVariantResponse:
+    """Map an internal ProductVariant to the public storefront contract."""
+    available = stock_count > 0
+    return PublicVariantResponse(
+        id=v.id,
+        sku_code=v.sku_code,
+        size_id=v.size_id,
+        size_name=v.size.name,
+        color_id=v.color_id,
+        color_name=v.color.name,
+        color_hex_code=v.color.hex_code,
+        fabric=v.fabric,
+        image_url=v.image_url,
+        mrp=v.mrp,
+        selling_price=v.selling_price,
+        stock_count=stock_count,
+        is_available=v.status == "active" and available,
+        status=v.status,
+    )
+
+
 # ── Products ──────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -50,6 +76,7 @@ router = APIRouter(prefix="/public", tags=["public"])
 )
 def list_public_products(
     tenant_id: uuid.UUID,
+    response: Response,
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     category_id: uuid.UUID | None = Query(default=None),
@@ -64,6 +91,7 @@ def list_public_products(
     pagination controls.
     """
     repo = PublicRepository(db)
+    _mark_uncached(response)
     products = repo.list_active_products(
         tenant_id,
         category_id=category_id,
@@ -78,22 +106,26 @@ def list_public_products(
     items = []
     for p in products:
         variants = repo.list_active_variants_for_product(tenant_id, p.id)
+        stock_by_variant = repo.available_stock_by_variant(
+            tenant_id,
+            [v.id for v in variants],
+        )
         items.append(
             PublicProductResponse(
                 id=p.id,
+                category_id=p.category_id,
+                product_group_id=p.product_group_id,
+                product_type_id=p.product_type_id,
+                brand_id=p.brand_id,
                 product_code=p.product_code,
                 name=p.name,
                 description=p.description,
                 image_url=p.image_url,
                 status=p.status,
                 variants=[
-                    PublicVariantResponse(
-                        id=v.id,
-                        sku_code=v.sku_code,
-                        image_url=v.image_url,
-                        mrp=v.mrp,
-                        selling_price=v.selling_price,
-                        status=v.status,
+                    _public_variant_response(
+                        v,
+                        stock_by_variant.get(v.id, 0),
                     )
                     for v in variants
                 ],
@@ -115,9 +147,11 @@ def list_public_products(
 def get_public_product(
     tenant_id: uuid.UUID,
     product_id: uuid.UUID,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> PublicProductResponse:
     """Return a single active product with all its active variants."""
+    _mark_uncached(response)
     from app.core.exceptions import NotFoundError
     from sqlalchemy import select
     from app.models.catalog import Product
@@ -136,22 +170,26 @@ def get_public_product(
 
     repo = PublicRepository(db)
     variants = repo.list_active_variants_for_product(tenant_id, product_id)
+    stock_by_variant = repo.available_stock_by_variant(
+        tenant_id,
+        [v.id for v in variants],
+    )
 
     return PublicProductResponse(
         id=product.id,
+        category_id=product.category_id,
+        product_group_id=product.product_group_id,
+        product_type_id=product.product_type_id,
+        brand_id=product.brand_id,
         product_code=product.product_code,
         name=product.name,
         description=product.description,
         image_url=product.image_url,
         status=product.status,
         variants=[
-            PublicVariantResponse(
-                id=v.id,
-                sku_code=v.sku_code,
-                image_url=v.image_url,
-                mrp=v.mrp,
-                selling_price=v.selling_price,
-                status=v.status,
+            _public_variant_response(
+                v,
+                stock_by_variant.get(v.id, 0),
             )
             for v in variants
         ],
@@ -166,9 +204,11 @@ def get_public_product(
 )
 def list_public_categories(
     tenant_id: uuid.UUID,
+    response: Response,
     db: Session = Depends(get_db),
 ) -> list[PublicCategoryResponse]:
     """Return all active categories in sort_order for the storefront nav."""
+    _mark_uncached(response)
     return PublicRepository(db).list_active_categories(tenant_id)  # type: ignore[return-value]
 
 

@@ -1,0 +1,204 @@
+# BeHazel'd IIS Deployment Environment Guide
+
+This guide wires the IIS-hosted luxury storefront to the BeHazeld OS backend.
+
+## 1. Website Environment Variables
+
+Set these variables before building/running the Next.js storefront in:
+
+`The Complete Story/BeHazeld_Website/frontend`
+
+### Option A: IIS hosts the website and proxies `/api` to FastAPI
+
+Use this when customers visit `https://behazeld.com` and IIS forwards
+`https://behazeld.com/api/...` to the FastAPI backend on port `8000`.
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://behazeld.com
+NEXT_PUBLIC_TENANT_ID=b86e1ba8-2d77-4eed-a069-4041504d3717
+```
+
+Important: do not set `NEXT_PUBLIC_API_BASE_URL=https://behazeld.com/api`.
+The storefront already calls `/api/v1/public/...`; setting `/api` twice would
+produce `/api/api/v1/...`. The website adapter also strips one trailing `/api`
+as a safety guard, but the clean value is `https://behazeld.com`.
+
+### Option B: Backend runs on a separate API domain
+
+Use this when the backend is exposed separately, for example
+`https://api.behazeld.com`.
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://api.behazeld.com
+NEXT_PUBLIC_TENANT_ID=b86e1ba8-2d77-4eed-a069-4041504d3717
+```
+
+### Option C: Temporary Railway backend
+
+Use this while the backend remains on Railway.
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://the-complete-story-production.up.railway.app
+NEXT_PUBLIC_TENANT_ID=b86e1ba8-2d77-4eed-a069-4041504d3717
+```
+
+## 2. Backend Environment Variables
+
+Set these for the FastAPI backend process.
+
+```env
+APP_ENV=production
+APP_NAME=BeHazeld E-Commerce OS
+API_V1_PREFIX=/api/v1
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DB?sslmode=require
+JWT_SECRET_KEY=<long-random-secret>
+JWT_ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+REFRESH_TOKEN_EXPIRE_DAYS=7
+CLOUDINARY_CLOUD_NAME=<cloudinary-cloud-name>
+CLOUDINARY_API_KEY=<cloudinary-api-key>
+CLOUDINARY_API_SECRET=<cloudinary-api-secret>
+ALLOWED_ORIGINS_RAW=https://behazeld.com,https://www.behazeld.com
+```
+
+If the Admin OS is hosted on a separate domain, add it too:
+
+```env
+ALLOWED_ORIGINS_RAW=https://behazeld.com,https://www.behazeld.com,https://admin.behazeld.com
+```
+
+For local testing:
+
+```env
+ALLOWED_ORIGINS_RAW=http://localhost:3000,http://localhost:3001,https://behazeld.com,https://www.behazeld.com
+```
+
+The backend uses `ALLOWED_ORIGINS_RAW` to configure CORS and allows credentials
+because the Admin OS uses httpOnly JWT cookies.
+
+## 3. IIS Reverse Proxy Setup with ARR
+
+Goal:
+
+```text
+https://behazeld.com/api/v1/public/{tenant_id}/products
+        -> http://127.0.0.1:8000/api/v1/public/{tenant_id}/products
+```
+
+### IIS prerequisites
+
+Install:
+
+1. IIS URL Rewrite Module
+2. Application Request Routing (ARR)
+
+Then enable proxying:
+
+1. Open IIS Manager.
+2. Click the server node.
+3. Open **Application Request Routing Cache**.
+4. Click **Server Proxy Settings**.
+5. Check **Enable proxy**.
+6. Apply.
+
+### URL Rewrite rule
+
+Create this rule on the IIS site for `behazeld.com`:
+
+```xml
+<rule name="ReverseProxyToFastAPI" stopProcessing="true">
+  <match url="^api/(.*)" />
+  <action type="Rewrite" url="http://127.0.0.1:8000/api/{R:1}" />
+</rule>
+```
+
+Explanation:
+
+- Browser calls: `https://behazeld.com/api/v1/public/...`
+- IIS matches everything after `/api/`.
+- IIS forwards to: `http://127.0.0.1:8000/api/v1/public/...`
+- FastAPI receives its real backend path unchanged.
+
+If FastAPI runs on another Windows service/port, update only the target:
+
+```xml
+<action type="Rewrite" url="http://127.0.0.1:8000/api/{R:1}" />
+```
+
+## 4. Backend Service on Windows/IIS Host
+
+FastAPI should run as a separate process behind IIS, for example:
+
+```powershell
+cd "C:\path\to\The Complete Story"
+set PYTHONPATH=C:\path\to\The Complete Story\BeHazeld_OS_Backend
+python -m uvicorn BeHazeld_OS_Backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+For production, run it as a Windows Service using NSSM, WinSW, or another
+service manager so it restarts automatically after server reboot.
+
+## 5. Public API Contract to Test
+
+Replace `<tenant_id>` with:
+
+```text
+b86e1ba8-2d77-4eed-a069-4041504d3717
+```
+
+Expected public endpoints:
+
+```text
+GET https://behazeld.com/api/v1/public/<tenant_id>/categories
+GET https://behazeld.com/api/v1/public/<tenant_id>/products
+GET https://behazeld.com/api/v1/public/<tenant_id>/products/<product_uuid>
+```
+
+The product response should include:
+
+```text
+product_code
+category_id
+image_url
+variants[].sku_code
+variants[].size_name
+variants[].color_name
+variants[].color_hex_code
+variants[].fabric
+variants[].mrp
+variants[].selling_price
+variants[].stock_count
+variants[].is_available
+variants[].image_url
+```
+
+## 6. Image Pipeline Validation
+
+Product and variant images must be uploaded from the Admin OS.
+
+Flow:
+
+```text
+Admin upload -> FastAPI ImageService -> Cloudinary secure_url -> Neon DB image_url -> Storefront renders URL
+```
+
+No image file should be manually copied into the website build. The website
+renders Cloudinary URLs directly from the public API.
+
+## 7. Go-Live Wiring Checklist
+
+1. Backend `/health` returns `{"status":"ok"}`.
+2. Backend `/health/db` returns database connected.
+3. IIS `/api/v1/public/<tenant_id>/categories` returns JSON.
+4. IIS `/api/v1/public/<tenant_id>/products` returns active products.
+5. Product variants include real `size_name`, `color_name`, `stock_count`, and `is_available`.
+6. Change a product selling price in Admin OS; refresh the product page and confirm the new price appears.
+7. Change a product category in Admin OS; confirm it moves to the correct website collection.
+8. Change a size/color in Admin OS; confirm product variant controls update.
+9. Upload a product image in Admin OS; confirm the storefront image URL is Cloudinary.
+10. Record stock movement to zero; confirm the storefront shows sold out and disables add to bag.
+11. Record stock movement above zero; confirm the variant becomes selectable again.
+12. Confirm `ALLOWED_ORIGINS_RAW` contains every live IIS/Vercel/Admin origin.
+13. Confirm browser devtools has no CORS errors.
+14. Confirm no `.env` secrets are committed to GitHub.
+

@@ -19,8 +19,11 @@ export function ProductDetailPage({ product }: { product: ProductDetail }) {
   const displayPrice = selectedVariant
     ? variantPrice(product, selectedVariant)
     : Number(product.min_price);
+  const displayMrp = Number(selectedVariant?.mrp ?? displayPrice);
+  const hasMarkdown = selectedVariant ? displayMrp > displayPrice : false;
 
-  const heroImage = product.primary_image?.transform_urls?.detail
+  const heroImage = selectedVariant?.image_url
+    ?? product.primary_image?.transform_urls?.detail
     ?? product.primary_image?.url
     ?? "";
 
@@ -70,14 +73,21 @@ export function ProductDetailPage({ product }: { product: ProductDetail }) {
         {/* ── Product info aside ────────────────────────────── */}
         <aside className="glass-panel h-fit p-6 lg:sticky lg:top-24">
           <p className="text-[10px] font-light uppercase tracking-[0.42em]" style={{ color: "#C09330" }}>
-            {product.variants[0]?.color ?? "Handcrafted"}
+            {product.product_code}
           </p>
           <h1 className="font-serif mt-3 text-4xl font-light italic leading-tight" style={{ color: "rgba(248,240,232,0.92)" }}>
             {product.name}
           </h1>
-          <p className="font-display mt-4 text-3xl font-normal" style={{ color: "#C09330" }}>
-            {formatCurrency(displayPrice)}
-          </p>
+          <div className="mt-4 flex items-baseline gap-3">
+            <p className="font-display text-3xl font-normal" style={{ color: "#C09330" }}>
+              {formatCurrency(displayPrice)}
+            </p>
+            {hasMarkdown && (
+              <p className="font-display text-lg font-light line-through" style={{ color: "rgba(177,152,112,0.58)" }}>
+                {formatCurrency(displayMrp)}
+              </p>
+            )}
+          </div>
 
           <div className="my-6 flex w-40 items-center gap-3">
             <span className="h-px flex-1" style={{ background: "linear-gradient(to right, #C09330, rgba(192,147,48,0.2))" }} />
@@ -112,7 +122,17 @@ export function ProductDetailPage({ product }: { product: ProductDetail }) {
                           color:   color === activeColor ? "#C09330" : "rgba(177,152,112,0.7)",
                           background: color === activeColor ? "rgba(192,147,48,0.1)" : "transparent",
                         }}
-                      >{color}</button>
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                          style={{
+                            background: product.variants.find((v) => v.color === color)?.color_hex_code ?? "transparent",
+                            border: "1px solid rgba(192,147,48,0.4)",
+                          }}
+                        />
+                        {color}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -152,6 +172,30 @@ export function ProductDetailPage({ product }: { product: ProductDetail }) {
               <div className="flex justify-between gap-6">
                 <dt style={{ color: "rgba(177,152,112,0.7)" }}>SKU</dt>
                 <dd className="font-light font-mono text-xs" style={{ color: "rgba(248,240,232,0.7)" }}>{selectedVariant.sku}</dd>
+              </div>
+            )}
+            {selectedVariant && (
+              <div className="flex justify-between gap-6">
+                <dt style={{ color: "rgba(177,152,112,0.7)" }}>Colour</dt>
+                <dd className="font-medium" style={{ color: "rgba(248,240,232,0.88)" }}>{selectedVariant.color}</dd>
+              </div>
+            )}
+            {selectedVariant && (
+              <div className="flex justify-between gap-6">
+                <dt style={{ color: "rgba(177,152,112,0.7)" }}>Size</dt>
+                <dd className="font-medium" style={{ color: "rgba(248,240,232,0.88)" }}>{selectedVariant.size}</dd>
+              </div>
+            )}
+            {selectedVariant?.fabric && (
+              <div className="flex justify-between gap-6">
+                <dt style={{ color: "rgba(177,152,112,0.7)" }}>Fabric</dt>
+                <dd className="font-medium text-right" style={{ color: "rgba(248,240,232,0.88)" }}>{selectedVariant.fabric}</dd>
+              </div>
+            )}
+            {selectedVariant && (
+              <div className="flex justify-between gap-6">
+                <dt style={{ color: "rgba(177,152,112,0.7)" }}>MRP</dt>
+                <dd className="font-medium" style={{ color: "rgba(248,240,232,0.88)" }}>{formatCurrency(selectedVariant.mrp)}</dd>
               </div>
             )}
             <div className="flex justify-between gap-6">

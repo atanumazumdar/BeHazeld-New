@@ -5,7 +5,7 @@ const DEFAULT_API_BASE_URL = "http://127.0.0.1:8000";
 
 const API_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL
-).replace(/\/$/, "");
+).replace(/\/$/, "").replace(/\/api$/, "");
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID;
 
@@ -15,14 +15,26 @@ const UUID_PATTERN =
 type OsVariant = {
   id: string;
   sku_code: string;
+  size_id?: string;
+  size_name?: string;
+  color_id?: string;
+  color_name?: string;
+  color_hex_code?: string | null;
+  fabric?: string | null;
   image_url: string | null;
   mrp: string;
   selling_price: string;
+  stock_count?: string | number;
+  is_available?: boolean;
   status: string;
 };
 
 type OsProduct = {
   id: string;
+  category_id?: string | null;
+  product_group_id?: string | null;
+  product_type_id?: string | null;
+  brand_id?: string | null;
   product_code: string;
   name: string;
   description: string | null;
@@ -124,16 +136,22 @@ function parseVariantMeta(skuCode: string): { color: string; size: string } {
 }
 
 function adaptVariant(variant: OsVariant, basePrice: number): ProductVariant {
-  const { color, size } = parseVariantMeta(variant.sku_code);
+  const fallback = parseVariantMeta(variant.sku_code);
   const sellingPrice = Number(variant.selling_price || 0);
+  const stockCount = Math.max(0, Math.floor(Number(variant.stock_count ?? 0)));
   return {
     id: variant.id,
     sku: variant.sku_code,
-    color,
-    size,
+    color: variant.color_name || fallback.color,
+    color_hex_code: variant.color_hex_code ?? null,
+    size: variant.size_name || fallback.size,
+    fabric: variant.fabric ?? null,
+    image_url: variant.image_url,
+    mrp: String(variant.mrp ?? sellingPrice.toFixed(2)),
+    selling_price: sellingPrice.toFixed(2),
     price_adjustment: (sellingPrice - basePrice).toFixed(2),
-    stock_count: variant.status === "active" ? 1 : 0,
-    is_available: variant.status === "active",
+    stock_count: stockCount,
+    is_available: variant.status === "active" && Boolean(variant.is_available) && stockCount > 0,
   };
 }
 
@@ -153,13 +171,17 @@ export function adaptProduct(product: OsProduct): Product {
 
   return {
     id: product.id,
+    product_code: product.product_code,
     name: product.name,
     slug: productSlug(product),
     description: product.description ?? "",
     base_price: basePrice.toFixed(2),
     is_active: product.status === "active",
     created_at: "",
-    collection_id: null,
+    collection_id: product.category_id ?? null,
+    product_group_id: product.product_group_id ?? null,
+    product_type_id: product.product_type_id ?? null,
+    brand_id: product.brand_id ?? null,
     primary_image: primaryImage,
     secondary_image: null,
     variants,
@@ -211,7 +233,7 @@ export async function fetchPublicProducts(
   if (options.search) params.set("search", options.search);
 
   const res = await fetch(`${url}?${params.toString()}`, {
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
   if (!res.ok) throw new Error(`Public products API returned ${res.status}`);
 
@@ -223,7 +245,7 @@ export async function fetchPublicProduct(productId: string): Promise<OsProduct |
   const url = publicUrl(`/products/${productId}`);
   if (!url) return null;
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { cache: "no-store" });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`Public product API returned ${res.status}`);
   return res.json();
@@ -233,7 +255,7 @@ export async function fetchPublicCategories(): Promise<OsCategory[]> {
   const url = publicUrl("/categories");
   if (!url) return [];
 
-  const res = await fetch(url, { next: { revalidate: 60 } });
+  const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) return [];
   return res.json();
 }

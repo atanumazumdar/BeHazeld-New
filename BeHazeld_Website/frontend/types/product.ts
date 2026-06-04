@@ -20,7 +20,12 @@ export type ProductVariant = {
   id:               string;
   sku:              string;
   color:            string;
+  color_hex_code:   string | null;
   size:             string;
+  fabric:           string | null;
+  image_url:        string | null;
+  mrp:              string;
+  selling_price:    string;
   price_adjustment: string;   // Decimal serialised as string
   stock_count:      number;
   is_available:     boolean;
@@ -29,6 +34,7 @@ export type ProductVariant = {
 // ── Product (listing view — includes primary_image + variants) ─────
 export type Product = {
   id:            string;
+  product_code:  string;
   name:          string;
   slug:          string;
   description:   string;
@@ -36,6 +42,9 @@ export type Product = {
   is_active:     boolean;
   created_at:    string;
   collection_id: string | null;
+  product_group_id: string | null;
+  product_type_id: string | null;
+  brand_id: string | null;
 
   primary_image:   ProductImage | null;
   secondary_image: ProductImage | null;
