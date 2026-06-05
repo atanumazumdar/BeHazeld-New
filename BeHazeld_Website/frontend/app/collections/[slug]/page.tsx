@@ -1,9 +1,9 @@
 /**
  * Dynamic collection page — /collections/[slug]
  *
- * generateStaticParams: runs at build time, fetches all active collection
- * slugs from the backend. New collections added to the DB automatically
- * get their page generated within the ISR revalidation window (60 s).
+ * generateStaticParams: in production it fetches collection slugs from the
+ * backend. In local dev it returns [] so Next does not prefetch remote catalog
+ * data during the compiling phase.
  *
  * If the backend is down at build time, generateStaticParams returns []
  * and all pages are rendered on-demand (SSR fallback).
@@ -33,6 +33,7 @@ const COLLECTION_TAGLINES: Record<string, [string, string]> = {
 
 // ── Static params (build-time SSG + ISR) ─────────────────────────
 export async function generateStaticParams() {
+  if (process.env.NODE_ENV !== "production") return [];
   const collections = await getCollections();
   return collections.map((c) => ({ slug: c.slug }));
 }
@@ -40,11 +41,14 @@ export async function generateStaticParams() {
 // ── Metadata ──────────────────────────────────────────────────────
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
-  const data = await getCollection(slug);
-  if (!data) return { title: "Collection Not Found" };
+  const name = slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
   return {
-    title: `${data.name} | BeHAZEL'd`,
-    description: data.description || `Shop the ${data.name} collection at BeHAZEL'd`,
+    title: `${name || "Collection"} | BeHAZEL'd`,
+    description: `Shop the ${name || "collection"} collection at BeHAZEL'd`,
   };
 }
 

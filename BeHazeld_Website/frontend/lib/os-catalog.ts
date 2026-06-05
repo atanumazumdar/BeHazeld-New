@@ -8,6 +8,15 @@ const API_BASE_URL = (
 ).replace(/\/$/, "").replace(/\/api$/, "");
 
 const TENANT_ID = process.env.NEXT_PUBLIC_TENANT_ID;
+const IS_LOCAL_DEV = process.env.NODE_ENV !== "production";
+const DEFAULT_PRODUCT_LIMIT = IS_LOCAL_DEV ? 24 : 100;
+const PRODUCT_LIMIT = Math.min(
+  200,
+  Math.max(
+    1,
+    Number(process.env.NEXT_PUBLIC_CATALOG_PRODUCT_LIMIT ?? DEFAULT_PRODUCT_LIMIT),
+  ),
+);
 
 const UUID_PATTERN =
   /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i;
@@ -223,12 +232,13 @@ export function adaptCategory(category: OsCategory): Collection {
 }
 
 export async function fetchPublicProducts(
-  options: { categoryId?: string; search?: string } = {},
+  options: { categoryId?: string; search?: string; limit?: number } = {},
 ): Promise<OsProduct[]> {
   const url = publicUrl("/products");
   if (!url) return [];
 
-  const params = new URLSearchParams({ limit: "200" });
+  const limit = Math.min(200, Math.max(1, options.limit ?? PRODUCT_LIMIT));
+  const params = new URLSearchParams({ limit: String(limit) });
   if (options.categoryId) params.set("category_id", options.categoryId);
   if (options.search) params.set("search", options.search);
 
