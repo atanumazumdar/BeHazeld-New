@@ -43,19 +43,22 @@ export function ProductGrid({ products, error }: ProductGridProps) {
   }
 
   return (
-    /* 4-column grid — inline styles bypass Tailwind v4 JIT scanning */
+    /* Fixed 4-column grid — each product image box is 350 × 450 px. */
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
+        gridTemplateColumns: "repeat(4, 350px)",
         gap: 0,
         border: "1px solid rgba(140,100,30,0.2)",
+        overflowX: "auto",
+        width: 1400,
+        maxWidth: "none",
       }}
     >
       {products.map((product, index) => (
         <div
           key={product.id}
-          style={{ borderRight: "1px solid rgba(140,100,30,0.2)" }}
+          style={{ width: 350, borderRight: "1px solid rgba(140,100,30,0.2)" }}
         >
           {/* index passed so placeholder shows "Pic 1", "Pic 2" … */}
           <ProductCard product={product} index={index} />

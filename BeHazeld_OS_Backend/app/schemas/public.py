@@ -24,6 +24,14 @@ class PublicCategoryResponse(BaseModel):
     sort_order: int
 
 
+class PublicProductGroupResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    description: str | None
+
+
 # ── Public variant response (price without cost_price) ────────────────────────
 
 class PublicVariantResponse(BaseModel):
@@ -59,7 +67,9 @@ class PublicProductResponse(BaseModel):
 
     id: uuid.UUID
     category_id: uuid.UUID | None
+    category_name: str | None = None
     product_group_id: uuid.UUID | None
+    product_group_name: str | None = None
     product_type_id: uuid.UUID | None
     brand_id: uuid.UUID | None
     product_code: str

@@ -2,8 +2,9 @@ import type { Collection, CollectionWithProducts } from "@/types/collection";
 import {
   adaptCategory,
   adaptProduct,
+  fetchAllPublicProducts,
   fetchPublicCategories,
-  fetchPublicProducts,
+  fetchPublicProductGroups,
   slugify,
 } from "@/lib/os-catalog";
 
@@ -14,38 +15,109 @@ export class CollectionLoadError extends Error {
   }
 }
 
-/**
- * Fetch all active collections (used for nav + generateStaticParams).
- * Returns an empty array if the backend is unreachable — safe for build time.
- */
+type StorefrontCollectionDefinition = {
+  name: string;
+};
+
+const STOREFRONT_COLLECTIONS: Record<string, StorefrontCollectionDefinition> = {
+  "campus-muse": { name: "Campus Muse" },
+  "power-edit": { name: "Power Edit" },
+  "afterglow-evenings": { name: "Afterglow Evenings" },
+  "ultra-luxe": { name: "Ultra Luxe" },
+  accessories: { name: "Accessories" },
+  "pre-loved": { name: "Pre Loved" },
+};
+
+function storefrontCollection(slug: string): Collection {
+  const definition = STOREFRONT_COLLECTIONS[slug];
+  const name =
+    definition?.name ??
+    slug
+      .split("-")
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(" ");
+
+  return {
+    id: slug,
+    name,
+    slug,
+    description: "",
+    hero_image_url: null,
+    display_order: 0,
+    is_active: true,
+    created_at: "",
+  };
+}
+
+function isStockedProduct(product: ReturnType<typeof adaptProduct>): boolean {
+  return product.total_stock > 0 && product.variants.some((variant) => variant.is_available);
+}
+
+function productMatchesCollection(product: ReturnType<typeof adaptProduct>, slug: string): boolean {
+  const definition = STOREFRONT_COLLECTIONS[slug];
+  if (!definition) return false;
+  const targetSlug = slugify(definition.name);
+  return [product.collection_name, product.product_group_name]
+    .filter((value): value is string => Boolean(value))
+    .some((value) => slugify(value) === targetSlug);
+}
+
 export async function getCollections(): Promise<Collection[]> {
   try {
-    const categories = await fetchPublicCategories();
-    return categories.map(adaptCategory);
+    const [categories, productGroups] = await Promise.all([
+      fetchPublicCategories(),
+      fetchPublicProductGroups(),
+    ]);
+    const osCategories = categories.map(adaptCategory);
+    const osProductGroups = productGroups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      slug: slugify(group.name),
+      description: group.description ?? "",
+      hero_image_url: null,
+      display_order: 0,
+      is_active: true,
+      created_at: "",
+    }));
+    const storefrontSections = Object.keys(STOREFRONT_COLLECTIONS).map(storefrontCollection);
+
+    const bySlug = new Map<string, Collection>();
+    for (const collection of [...storefrontSections, ...osCategories, ...osProductGroups]) {
+      bySlug.set(collection.slug, collection);
+    }
+
+    return Array.from(bySlug.values()).sort((a, b) => a.display_order - b.display_order);
   } catch {
-    return [];
+    return Object.keys(STOREFRONT_COLLECTIONS).map(storefrontCollection);
   }
 }
 
-/**
- * Fetch a single collection with all its active products (images + variants).
- * Returns null if not found or backend is unreachable.
- *
- * Adding a product to the DB with this collection's id is the *only*
- * step needed to make it appear on the page — no TSX changes required.
- */
 export async function getCollection(
   slug: string,
 ): Promise<CollectionWithProducts | null> {
   try {
     const categories = await fetchPublicCategories();
     const category = categories.find((item) => slugify(item.name) === slug);
-    if (!category) return null;
 
-    const products = await fetchPublicProducts({ categoryId: category.id });
+    if (category) {
+      const products = await fetchAllPublicProducts({ categoryId: category.id, pageSize: 100 });
+      return {
+        ...adaptCategory(category),
+        products: products.map(adaptProduct).filter(isStockedProduct),
+      };
+    }
+
+    const products = await fetchAllPublicProducts({ pageSize: 100 });
+    const matchedProducts = products
+      .map(adaptProduct)
+      .filter((product) => isStockedProduct(product) && productMatchesCollection(product, slug));
+
+    if (!STOREFRONT_COLLECTIONS[slug] && matchedProducts.length === 0) return null;
+
     return {
-      ...adaptCategory(category),
-      products: products.map(adaptProduct),
+      ...storefrontCollection(slug),
+      products: matchedProducts,
     };
   } catch {
     return null;

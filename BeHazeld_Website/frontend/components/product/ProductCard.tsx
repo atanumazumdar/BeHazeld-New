@@ -28,15 +28,16 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
     ? variantPrice(product, selectedVariant)
     : Number(product.min_price);
 
-  const colors = [...new Set(product.variants.map((v) => v.color))];
+  const availableVariants = product.variants.filter((variant) => variant.is_available);
+  const colors = [...new Set(availableVariants.map((v) => v.color))];
   const sizesForColor = (color: string) =>
-    product.variants.filter((v) => v.color === color && v.is_available);
+    availableVariants.filter((v) => v.color === color);
   const activeColor = selectedVariant?.color ?? colors[0] ?? "";
 
   const picLabel = `Pic ${index + 1}`;
 
   return (
-    <article style={{ display: "flex", flexDirection: "column" }}>
+    <article style={{ display: "flex", flexDirection: "column", width: 350 }}>
 
       {/* ── Single portrait image ──────────────────────────────── */}
       <a
@@ -47,7 +48,8 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
         <div
           className="relative overflow-hidden"
           style={{
-            aspectRatio: "3/4",
+            width: 350,
+            height: 450,
             background: "linear-gradient(145deg, #D8CEBC 0%, #C8BCA8 100%)",
             border: "1px solid rgba(140,100,30,0.2)",
             borderBottom: "none",
@@ -167,19 +169,6 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
                   background: color === activeColor ? "rgba(139,105,20,0.08)" : "transparent",
                 }}
               >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 7,
-                    height: 7,
-                    borderRadius: 999,
-                    marginRight: 4,
-                    verticalAlign: "-1px",
-                    background: product.variants.find((v) => v.color === color)?.color_hex_code ?? "transparent",
-                    border: "1px solid rgba(140,100,30,0.32)",
-                  }}
-                />
                 {color}
               </button>
             ))}

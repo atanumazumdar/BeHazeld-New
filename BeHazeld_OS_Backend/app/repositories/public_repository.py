@@ -20,7 +20,7 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models.catalog import Category, Product, ProductVariant
+from app.models.catalog import Category, Product, ProductGroup, ProductVariant
 from app.models.inventory import StockBalance
 
 
@@ -54,6 +54,10 @@ class PublicRepository:
         """
         stmt = (
             select(Product)
+            .options(
+                selectinload(Product.category),
+                selectinload(Product.product_group),
+            )
             .where(
                 Product.tenant_id == tenant_id,
                 Product.status == "active",
@@ -165,5 +169,17 @@ class PublicRepository:
                 Category.is_active.is_(True),
             )
             .order_by(Category.sort_order, Category.name)
+        )
+        return list(self.db.execute(stmt).scalars().all())
+
+    def list_active_product_groups(self, tenant_id: uuid.UUID) -> list[ProductGroup]:
+        """Return all active product groups ordered by name."""
+        stmt = (
+            select(ProductGroup)
+            .where(
+                ProductGroup.tenant_id == tenant_id,
+                ProductGroup.is_active.is_(True),
+            )
+            .order_by(ProductGroup.name)
         )
         return list(self.db.execute(stmt).scalars().all())

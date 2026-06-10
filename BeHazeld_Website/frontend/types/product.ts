@@ -42,7 +42,9 @@ export type Product = {
   is_active:     boolean;
   created_at:    string;
   collection_id: string | null;
+  collection_name: string | null;
   product_group_id: string | null;
+  product_group_name: string | null;
   product_type_id: string | null;
   brand_id: string | null;
 

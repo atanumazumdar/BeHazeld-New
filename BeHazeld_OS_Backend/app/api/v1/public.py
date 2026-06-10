@@ -13,6 +13,7 @@ tenant's UUID in its build config.
 GET  /{tenant_id}/products                   — paginated active products
 GET  /{tenant_id}/products/{product_id}      — single product + variants
 GET  /{tenant_id}/categories                 — category list (flat)
+GET  /{tenant_id}/product-groups             — product group / collection list
 POST /{tenant_id}/customers/register         — customer self-registration
 
 Performance notes
@@ -34,6 +35,7 @@ from app.schemas.public import (
     PaginatedProductsResponse,
     PublicCategoryResponse,
     PublicCustomerResponse,
+    PublicProductGroupResponse,
     PublicProductResponse,
     PublicRegisterCustomerRequest,
     PublicVariantResponse,
@@ -65,6 +67,31 @@ def _public_variant_response(v, stock_count) -> PublicVariantResponse:
         stock_count=stock_count,
         is_available=v.status == "active" and available,
         status=v.status,
+    )
+
+
+def _public_product_response(p, variants, stock_by_variant) -> PublicProductResponse:
+    """Map an internal Product to the public storefront contract."""
+    return PublicProductResponse(
+        id=p.id,
+        category_id=p.category_id,
+        category_name=p.category.name if p.category else None,
+        product_group_id=p.product_group_id,
+        product_group_name=p.product_group.name if p.product_group else None,
+        product_type_id=p.product_type_id,
+        brand_id=p.brand_id,
+        product_code=p.product_code,
+        name=p.name,
+        description=p.description,
+        image_url=p.image_url,
+        status=p.status,
+        variants=[
+            _public_variant_response(
+                v,
+                stock_by_variant.get(v.id, 0),
+            )
+            for v in variants
+        ],
     )
 
 
@@ -110,27 +137,7 @@ def list_public_products(
             tenant_id,
             [v.id for v in variants],
         )
-        items.append(
-            PublicProductResponse(
-                id=p.id,
-                category_id=p.category_id,
-                product_group_id=p.product_group_id,
-                product_type_id=p.product_type_id,
-                brand_id=p.brand_id,
-                product_code=p.product_code,
-                name=p.name,
-                description=p.description,
-                image_url=p.image_url,
-                status=p.status,
-                variants=[
-                    _public_variant_response(
-                        v,
-                        stock_by_variant.get(v.id, 0),
-                    )
-                    for v in variants
-                ],
-            )
-        )
+        items.append(_public_product_response(p, variants, stock_by_variant))
 
     return PaginatedProductsResponse(
         total=total,
@@ -154,10 +161,15 @@ def get_public_product(
     _mark_uncached(response)
     from app.core.exceptions import NotFoundError
     from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
     from app.models.catalog import Product
 
     stmt = (
         select(Product)
+        .options(
+            selectinload(Product.category),
+            selectinload(Product.product_group),
+        )
         .where(
             Product.id == product_id,
             Product.tenant_id == tenant_id,
@@ -175,25 +187,7 @@ def get_public_product(
         [v.id for v in variants],
     )
 
-    return PublicProductResponse(
-        id=product.id,
-        category_id=product.category_id,
-        product_group_id=product.product_group_id,
-        product_type_id=product.product_type_id,
-        brand_id=product.brand_id,
-        product_code=product.product_code,
-        name=product.name,
-        description=product.description,
-        image_url=product.image_url,
-        status=product.status,
-        variants=[
-            _public_variant_response(
-                v,
-                stock_by_variant.get(v.id, 0),
-            )
-            for v in variants
-        ],
-    )
+    return _public_product_response(product, variants, stock_by_variant)
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
@@ -210,6 +204,20 @@ def list_public_categories(
     """Return all active categories in sort_order for the storefront nav."""
     _mark_uncached(response)
     return PublicRepository(db).list_active_categories(tenant_id)  # type: ignore[return-value]
+
+
+@router.get(
+    "/{tenant_id}/product-groups",
+    response_model=list[PublicProductGroupResponse],
+)
+def list_public_product_groups(
+    tenant_id: uuid.UUID,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> list[PublicProductGroupResponse]:
+    """Return all active product groups / collections for storefront grouping."""
+    _mark_uncached(response)
+    return PublicRepository(db).list_active_product_groups(tenant_id)  # type: ignore[return-value]
 
 
 # ── Customer self-registration ────────────────────────────────────────────────

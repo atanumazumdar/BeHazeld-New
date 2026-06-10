@@ -13,7 +13,7 @@ export type CheckoutPayload = {
 };
 
 export type CheckoutOrder = {
-  id: string;
+  id: number;
   status: string;
   subtotal: string;
   shipping_total: string;

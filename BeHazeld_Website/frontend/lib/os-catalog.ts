@@ -41,7 +41,9 @@ type OsVariant = {
 type OsProduct = {
   id: string;
   category_id?: string | null;
+  category_name?: string | null;
   product_group_id?: string | null;
+  product_group_name?: string | null;
   product_type_id?: string | null;
   brand_id?: string | null;
   product_code: string;
@@ -64,6 +66,12 @@ type OsCategory = {
   name: string;
   description: string | null;
   sort_order: number;
+};
+
+type OsProductGroup = {
+  id: string;
+  name: string;
+  description: string | null;
 };
 
 function publicUrl(path: string): string | null {
@@ -168,15 +176,14 @@ export function adaptProduct(product: OsProduct): Product {
   const activeVariants = product.variants.filter((variant) => variant.status === "active");
   const variantPrices = activeVariants.map((variant) => Number(variant.selling_price || 0));
   const basePrice = variantPrices.length > 0 ? Math.min(...variantPrices) : 0;
+  const variants = activeVariants.map((variant) => adaptVariant(variant, basePrice));
   const primaryImage =
     imageFromUrl(`${product.id}:product`, product.image_url, product.name) ??
     imageFromUrl(
       `${product.id}:variant`,
-      activeVariants.find((variant) => variant.image_url)?.image_url ?? null,
+      variants.find((variant) => variant.is_available && variant.image_url)?.image_url ?? null,
       product.name,
     );
-
-  const variants = activeVariants.map((variant) => adaptVariant(variant, basePrice));
 
   return {
     id: product.id,
@@ -188,7 +195,9 @@ export function adaptProduct(product: OsProduct): Product {
     is_active: product.status === "active",
     created_at: "",
     collection_id: product.category_id ?? null,
+    collection_name: product.category_name ?? null,
     product_group_id: product.product_group_id ?? null,
+    product_group_name: product.product_group_name ?? null,
     product_type_id: product.product_type_id ?? null,
     brand_id: product.brand_id ?? null,
     primary_image: primaryImage,
@@ -251,6 +260,42 @@ export async function fetchPublicProducts(
   return data.items ?? [];
 }
 
+export async function fetchAllPublicProducts(
+  options: { categoryId?: string; search?: string; pageSize?: number } = {},
+): Promise<OsProduct[]> {
+  const url = publicUrl("/products");
+  if (!url) return [];
+
+  const pageSize = Math.min(200, Math.max(1, options.pageSize ?? PRODUCT_LIMIT));
+  const items: OsProduct[] = [];
+  let skip = 0;
+  let total = 0;
+
+  do {
+    const params = new URLSearchParams({
+      limit: String(pageSize),
+      skip: String(skip),
+    });
+    if (options.categoryId) params.set("category_id", options.categoryId);
+    if (options.search) params.set("search", options.search);
+
+    const res = await fetch(`${url}?${params.toString()}`, {
+      cache: "no-store",
+    });
+    if (!res.ok) throw new Error(`Public products API returned ${res.status}`);
+
+    const data = (await res.json()) as OsProductsResponse;
+    const pageItems = data.items ?? [];
+    total = data.total ?? items.length + pageItems.length;
+    items.push(...pageItems);
+
+    if (pageItems.length === 0) break;
+    skip += pageItems.length;
+  } while (items.length < total);
+
+  return items;
+}
+
 export async function fetchPublicProduct(productId: string): Promise<OsProduct | null> {
   const url = publicUrl(`/products/${productId}`);
   if (!url) return null;
@@ -263,6 +308,15 @@ export async function fetchPublicProduct(productId: string): Promise<OsProduct |
 
 export async function fetchPublicCategories(): Promise<OsCategory[]> {
   const url = publicUrl("/categories");
+  if (!url) return [];
+
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function fetchPublicProductGroups(): Promise<OsProductGroup[]> {
+  const url = publicUrl("/product-groups");
   if (!url) return [];
 
   const res = await fetch(url, { cache: "no-store" });

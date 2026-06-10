@@ -132,7 +132,7 @@ export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: 
       <div style={{ background: BODY_BG, minHeight: "60vh" }}>
         <div
           style={{
-            maxWidth: 1280,
+            maxWidth: 1400,
             margin: "0 auto",
             padding: "clamp(28px, 4vw, 56px) clamp(16px, 3vw, 40px) 96px",
           }}

@@ -8,13 +8,13 @@ const EASE_OUT  = [0.16, 1, 0.3, 1] as const;
 const EASE_SILK = [0.76, 0, 0.24, 1] as const;
 
 const PAGE: Variants = {
-  initial: { opacity: 0 },
+  initial: { opacity: 1 },
   animate: { opacity: 1, transition: { duration: 0.5, ease: "easeOut" } },
 };
 
 function up(delay: number) {
   return {
-    initial: { opacity: 0, y: 16 },
+    initial: { opacity: 1, y: 0 },
     animate: { opacity: 1, y: 0 },
     transition: { duration: 0.75, ease: EASE_OUT, delay },
   };
@@ -41,7 +41,7 @@ const SERIF_ITALIC: React.CSSProperties = {
 function GoldRule({ delay }: { delay: number }) {
   return (
     <motion.div
-      initial={{ scaleX: 0, opacity: 0 }}
+      initial={{ scaleX: 1, opacity: 1 }}
       animate={{ scaleX: 1, opacity: 1 }}
       transition={{ duration: 0.8, ease: EASE_SILK, delay }}
       className="flex items-center gap-3 mb-4"
@@ -103,7 +103,7 @@ export default function OurStoryPage() {
 
         {/* Entrance → perpetual float */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.88, y: 36 }}
+          initial={{ opacity: 1, scale: 1.0, y: 0 }}
           animate={{ opacity: 1, scale: 1.0, y: 0 }}
           transition={{ duration: 1.5, ease: EASE_OUT }}
           className="relative z-10"
@@ -170,7 +170,7 @@ export default function OurStoryPage() {
           {/* H1 — three-tier typographic cascade */}
           <div style={{ overflow: "hidden" }}>
             <motion.h1
-              initial={{ y: "108%" }} animate={{ y: 0 }}
+              initial={{ y: 0 }} animate={{ y: 0 }}
               transition={{ duration: 1.1, ease: EASE_SILK, delay: 0.7 }}
               className="leading-none mb-4"
             >

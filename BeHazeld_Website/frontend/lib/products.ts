@@ -2,9 +2,9 @@ import type { Product, ProductDetail } from "@/types/product";
 import {
   adaptProduct,
   adaptProductDetail,
+  fetchAllPublicProducts,
   fetchPublicCategories,
   fetchPublicProduct,
-  fetchPublicProducts,
   productIdFromSlug,
   slugify,
 } from "@/lib/os-catalog";
@@ -32,8 +32,10 @@ export async function getProducts(
       categoryId = category.id;
     }
 
-    const products = await fetchPublicProducts({ categoryId });
-    return products.map(adaptProduct);
+    const products = await fetchAllPublicProducts({ categoryId });
+    return products
+      .map(adaptProduct)
+      .filter((product) => product.total_stock > 0 && product.variants.some((variant) => variant.is_available));
   } catch (err) {
     if (err instanceof ProductLoadError) throw err;
     throw new ProductLoadError("Backend offline: unable to load products");
