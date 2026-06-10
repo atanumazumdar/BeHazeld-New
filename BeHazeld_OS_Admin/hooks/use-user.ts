@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/lib/api-client';
+import { getCurrentUserAction } from '@/lib/auth-actions';
 import type { UserResponse } from '@/types/api';
 
 interface UseUserResult {
@@ -16,13 +16,12 @@ export function useUser(): UseUserResult {
   useEffect(() => {
     let cancelled = false;
 
-    apiClient
-      .get<UserResponse>('/api/v1/auth/me')
-      .then((data) => {
-        if (!cancelled) setUser(data);
+    getCurrentUserAction()
+      .then((result) => {
+        if (!cancelled && result.success) setUser(result.user ?? null);
       })
       .catch(() => {
-        // 401 handled by api-client (redirects to /login)
+        // Keep the dashboard stable if the profile lookup fails.
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
