@@ -87,8 +87,8 @@ export function useDashboardMetrics() {
       const result = await getDashboardMetricsAction();
       return requireActionData(result, 'Failed to load dashboard metrics.');
     },
-    staleTime: 60_000,        // refresh at most once per minute
-    refetchInterval: 120_000, // background refresh every 2 min
+    staleTime: Infinity,
+    retry: false,
   });
 }
 
@@ -99,8 +99,8 @@ export function useLowStock() {
       const result = await getLowStockAction();
       return requireActionData(result, 'Failed to load low stock report.');
     },
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: Infinity,
+    retry: false,
   });
 }
 
@@ -111,6 +111,8 @@ export function useGstSummary(fromDate?: string, toDate?: string) {
       const result = await getGstSummaryAction(fromDate, toDate);
       return requireActionData(result, 'Failed to load GST summary.');
     },
+    staleTime: Infinity,
+    retry: false,
   });
 }
 
@@ -133,6 +135,8 @@ export function useProfitAndLoss(fromDate?: string, toDate?: string) {
       const result = await getProfitAndLossAction(fromDate, toDate);
       return requireActionData(result, 'Failed to load profit and loss.');
     },
+    staleTime: Infinity,
+    retry: false,
   });
 }
 

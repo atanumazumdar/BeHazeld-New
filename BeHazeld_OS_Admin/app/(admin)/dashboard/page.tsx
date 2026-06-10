@@ -9,7 +9,7 @@
  *  - GET /reports/gst          → net_gst_payable
  *  - GET /reports/low-stock    → low-stock variant list
  *
- * All queries use refetchInterval so numbers update without page reload.
+ * Metrics load once per page visit; use browser refresh to reload numbers.
  */
 
 import Link from 'next/link';
@@ -208,7 +208,7 @@ export default function DashboardPage() {
       <div>
         <h1 className="text-2xl font-semibold text-slate-800">Executive Dashboard</h1>
         <p className="mt-1 text-sm text-stone-500">
-          Live business metrics — refreshes every 2 minutes.
+          Business metrics as of the latest page load.
         </p>
       </div>
 
