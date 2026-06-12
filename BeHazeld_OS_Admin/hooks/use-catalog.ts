@@ -271,9 +271,32 @@ export function useUploadVariantImage(productId: string) {
       const result = await uploadVariantImageAction(productId, variantId, form);
       return requireActionData(result, 'Failed to upload variant image.') as ProductVariantResponse;
     },
-    onSuccess: () => {
+    onSuccess: (updatedVariant) => {
+      qc.setQueryData<ProductVariantResponse[]>(
+        catalogKeys.variants(productId),
+        (existing) => existing?.map((variant) =>
+          variant.id === updatedVariant.id ? updatedVariant : variant,
+        ),
+      );
+
+      qc.setQueriesData<ProductResponse[]>(
+        { queryKey: [...catalogKeys.all, 'products'] },
+        (existing) => existing?.map((product) => {
+          if (product.id !== productId || !product.variants) return product;
+
+          return {
+            ...product,
+            variants: product.variants.map((variant) =>
+              variant.id === updatedVariant.id ? updatedVariant : variant,
+            ),
+          };
+        }),
+      );
+
       qc.invalidateQueries({ queryKey: catalogKeys.variants(productId) });
-      qc.invalidateQueries({ queryKey: catalogKeys.products() });
+      qc.invalidateQueries({ queryKey: [...catalogKeys.all, 'products'] });
+      qc.refetchQueries({ queryKey: catalogKeys.variants(productId), type: 'active' });
+      qc.refetchQueries({ queryKey: [...catalogKeys.all, 'products'], type: 'active' });
     },
   });
 }
