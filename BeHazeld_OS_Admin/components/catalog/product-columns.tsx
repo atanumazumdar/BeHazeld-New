@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { type ChangeEvent, useRef } from 'react';
 import { toast } from 'sonner';
 import { useUploadVariantImage } from '@/hooks/use-catalog';
+import { prepareProductImageForUpload } from '@/lib/image-upload';
 
 interface ProductActionsProps {
   productId: string;
@@ -56,7 +57,11 @@ export function ProductRowActions({
     if (!file || !variantId) return;
 
     try {
-      await uploadVariantImage.mutateAsync({ variantId, file });
+      const preparedFile = await prepareProductImageForUpload(file);
+      if (preparedFile.size < file.size) {
+        toast.info('Photo optimized for upload.');
+      }
+      await uploadVariantImage.mutateAsync({ variantId, file: preparedFile });
       toast.success(hasImage ? 'Picture updated.' : 'Picture uploaded.');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to upload picture.';

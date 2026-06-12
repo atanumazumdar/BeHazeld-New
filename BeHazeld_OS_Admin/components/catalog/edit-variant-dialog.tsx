@@ -28,6 +28,7 @@ import {
   useUpdateVariant,
   useUploadVariantImage,
 } from '@/hooks/use-catalog';
+import { prepareProductImageForUpload } from '@/lib/image-upload';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
 
 interface EditVariantDialogProps {
@@ -233,7 +234,26 @@ export function EditVariantDialog({
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
                       className="hidden"
-                      onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0] ?? null;
+                        event.target.value = '';
+                        if (!file) {
+                          onChange(null);
+                          return;
+                        }
+
+                        try {
+                          const preparedFile = await prepareProductImageForUpload(file);
+                          if (preparedFile.size < file.size) {
+                            toast.info('Photo optimized for upload.');
+                          }
+                          onChange(preparedFile);
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : 'Failed to prepare picture.';
+                          toast.error(msg);
+                          onChange(null);
+                        }
+                      }}
                     />
                     <span className="truncate">
                       {value ? value.name : variant?.image_url ? 'Replace existing picture' : 'Upload picture'}

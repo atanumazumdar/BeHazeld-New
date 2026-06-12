@@ -20,7 +20,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Controller } from 'react-hook-form';
+import { toast } from 'sonner';
 import { useSizes, useColors } from '@/hooks/use-catalog';
+import { prepareProductImageForUpload } from '@/lib/image-upload';
 import type { WizardFormValues } from './create-product-wizard';
 
 interface VariantRowProps {
@@ -178,7 +180,26 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
                 className="hidden"
-                onChange={(event) => onChange(event.target.files?.[0] ?? null)}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0] ?? null;
+                  event.target.value = '';
+                  if (!file) {
+                    onChange(null);
+                    return;
+                  }
+
+                  try {
+                    const preparedFile = await prepareProductImageForUpload(file);
+                    if (preparedFile.size < file.size) {
+                      toast.info('Photo optimized for upload.');
+                    }
+                    onChange(preparedFile);
+                  } catch (err) {
+                    const msg = err instanceof Error ? err.message : 'Failed to prepare picture.';
+                    toast.error(msg);
+                    onChange(null);
+                  }
+                }}
               />
               <span className="truncate">{value ? value.name : 'Upload'}</span>
             </label>
