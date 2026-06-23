@@ -77,6 +77,32 @@ class AuthService:
         self.user_repo.revoke_refresh_token(refresh_token)
         self.db.commit()
 
+    def request_password_reset(self, email: str) -> str | None:
+        user = self.user_repo.get_by_email(email)
+        if user is None or not user.is_active:
+            return None
+
+        return security.create_password_reset_token({
+            "sub": str(user.id),
+            "tenant_id": str(user.tenant_id),
+        })
+
+    def reset_password(self, reset_token: str, new_password: str) -> None:
+        if len(new_password) < 8:
+            raise InvalidCredentialsError("Password must be at least 8 characters")
+
+        payload = security.decode_token(reset_token)
+        if payload.get("type") != "password_reset":
+            raise InvalidCredentialsError("Invalid reset token")
+
+        user = self.user_repo.get_by_id(uuid.UUID(payload["sub"]))
+        if not user.is_active:
+            raise InvalidCredentialsError("User account is inactive")
+
+        self.user_repo.update_password(user.id, security.hash_password(new_password))
+        self.user_repo.revoke_all_refresh_tokens_for_user(user.id)
+        self.db.commit()
+
     def get_current_user(self, user_id: uuid.UUID) -> UserResponse:
         user = self.user_repo.get_by_id(user_id)
         return UserResponse.model_validate(user)

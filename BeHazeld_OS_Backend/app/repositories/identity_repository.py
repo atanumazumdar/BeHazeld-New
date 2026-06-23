@@ -71,6 +71,12 @@ class UserRepository:
         self.db.flush()
         return user
 
+    def update_password(self, user_id: uuid.UUID, hashed_password: str) -> User:
+        user = self.get_by_id(user_id)
+        user.hashed_password = hashed_password
+        self.db.flush()
+        return user
+
     # ── refresh token management ──────────────────────────────────────────────
 
     def store_refresh_token(

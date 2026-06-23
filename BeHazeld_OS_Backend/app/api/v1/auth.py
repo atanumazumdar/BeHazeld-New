@@ -19,7 +19,16 @@ from sqlalchemy.orm import Session
 from app.api.deps import TenantContext, get_current_tenant
 from app.core.config import settings
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, RefreshRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    MessageResponse,
+    RefreshRequest,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserResponse,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -61,6 +70,27 @@ def login(
     tokens = AuthService(db).login(body.email, body.password)
     _set_auth_cookies(response, tokens)
     return tokens
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(
+    body: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+) -> ForgotPasswordResponse:
+    token = AuthService(db).request_password_reset(body.email)
+    return ForgotPasswordResponse(
+        message="If the account exists, a password reset token has been generated.",
+        reset_token=token,
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(
+    body: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    AuthService(db).reset_password(body.reset_token, body.new_password)
+    return MessageResponse(message="Password has been reset. Please sign in.")
 
 
 @router.post("/refresh", response_model=TokenResponse)

@@ -25,6 +25,12 @@ export interface LoginResult {
   message?: string;
 }
 
+export interface ForgotPasswordResult {
+  success: boolean;
+  message?: string;
+  resetToken?: string | null;
+}
+
 export interface CurrentUserResult {
   success: boolean;
   user?: UserResponse;
@@ -116,6 +122,63 @@ export async function loginAction(formData: FormData): Promise<LoginResult> {
   });
 
   return { success: true };
+}
+
+export async function forgotPasswordAction(formData: FormData): Promise<ForgotPasswordResult> {
+  const email = formData.get('email') as string;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/v1/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return { success: false, message: 'Could not start password reset. Please try again.' };
+  }
+
+  const body = await response.json();
+  return {
+    success: true,
+    message: body.message ?? 'If the account exists, a reset token has been generated.',
+    resetToken: body.reset_token ?? null,
+  };
+}
+
+export async function resetPasswordAction(formData: FormData): Promise<LoginResult> {
+  const resetToken = formData.get('reset_token') as string;
+  const newPassword = formData.get('new_password') as string;
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}/api/v1/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reset_token: resetToken, new_password: newPassword }),
+    });
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    let message = 'Could not reset password. Please try again.';
+    try {
+      const body = await response.json();
+      if (body.message) message = body.message;
+      if (body.detail) message = body.detail;
+    } catch {
+      // ignore parse error
+    }
+    return { success: false, message };
+  }
+
+  const body = await response.json();
+  return { success: true, message: body.message ?? 'Password has been reset. Please sign in.' };
 }
 
 export async function getCurrentUserAction(): Promise<CurrentUserResult> {
