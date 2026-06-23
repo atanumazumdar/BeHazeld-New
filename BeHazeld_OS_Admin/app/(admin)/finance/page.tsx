@@ -36,6 +36,7 @@ import {
   useJournalEntries,
   useImportAccountCodes,
   useImportJournalEntries,
+  useReverseJournalEntry,
   downloadTrialBalanceCsv,
   downloadProfitLossCsv,
 } from '@/hooks/use-reports';
@@ -546,7 +547,22 @@ function AccountingCodesTab() {
 function JournalEntriesTab() {
   const { data: accounts = [] } = useFinanceAccounts();
   const { data: journals = [], error, isLoading } = useJournalEntries();
+  const reverseJournal = useReverseJournalEntry();
   const accountById = new Map(accounts.map((account) => [account.id, account]));
+
+  const handleReverse = async (entryId: string, entryNumber: string) => {
+    if (!confirm(`Reverse journal ${entryNumber}? This will post an equal-and-opposite journal entry.`)) {
+      return;
+    }
+
+    try {
+      const reversal = await reverseJournal.mutateAsync(entryId);
+      toast.success(`Journal reversed with ${reversal.entry_number}.`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to reverse journal entry.';
+      toast.error(message);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
@@ -559,26 +575,27 @@ function JournalEntriesTab() {
             <TableHead className="text-stone-600 font-medium text-xs text-right">Debit</TableHead>
             <TableHead className="text-stone-600 font-medium text-xs text-right">Credit</TableHead>
             <TableHead className="text-stone-600 font-medium text-xs">Status</TableHead>
+            <TableHead className="text-stone-600 font-medium text-xs text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {error ? (
             <TableRow>
-              <TableCell colSpan={6} className="py-12 text-center text-red-600">
+              <TableCell colSpan={7} className="py-12 text-center text-red-600">
                 {error instanceof Error ? error.message : 'Failed to load journal entries.'}
               </TableCell>
             </TableRow>
           ) : isLoading ? (
             Array.from({ length: 8 }).map((_, i) => (
               <TableRow key={i}>
-                {Array.from({ length: 6 }).map((_, j) => (
+                {Array.from({ length: 7 }).map((_, j) => (
                   <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                 ))}
               </TableRow>
             ))
           ) : journals.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={6} className="py-12 text-center text-stone-400">
+              <TableCell colSpan={7} className="py-12 text-center text-stone-400">
                 No journal entries found. Import Journal Entries CSV first.
               </TableCell>
             </TableRow>
@@ -597,7 +614,26 @@ function JournalEntriesTab() {
                 <TableCell />
                 <TableCell />
                 <TableCell>
-                  <Badge className="bg-blue-100 text-blue-700">{journal.status}</Badge>
+                  <Badge
+                    className={
+                      journal.status === 'reversed'
+                        ? 'bg-stone-100 text-stone-600'
+                        : 'bg-blue-100 text-blue-700'
+                    }
+                  >
+                    {journal.status}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={journal.status === 'reversed' || reverseJournal.isPending}
+                    onClick={() => handleReverse(journal.id, journal.entry_number)}
+                  >
+                    Reverse
+                  </Button>
                 </TableCell>
               </TableRow>,
               ...journal.lines.map((line) => {
@@ -623,6 +659,7 @@ function JournalEntriesTab() {
                     <TableCell className="text-right font-mono text-sm text-slate-600">
                       {parseFloat(line.credit_amount) > 0 ? money(line.credit_amount) : '—'}
                     </TableCell>
+                    <TableCell />
                     <TableCell />
                   </TableRow>
                 );

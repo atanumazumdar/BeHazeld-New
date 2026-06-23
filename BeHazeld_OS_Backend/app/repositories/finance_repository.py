@@ -211,6 +211,7 @@ class FinanceRepository:
     ) -> JournalEntry:
         stmt = (
             select(JournalEntry)
+            .options(selectinload(JournalEntry.lines))
             .where(
                 JournalEntry.id == entry_id,
                 JournalEntry.tenant_id == tenant_id,
@@ -220,6 +221,11 @@ class FinanceRepository:
         if obj is None:
             raise NotFoundError(f"Journal entry {entry_id} not found")
         return obj
+
+    def mark_journal_reversed(self, entry: JournalEntry) -> JournalEntry:
+        entry.status = "reversed"
+        self.db.flush()
+        return entry
 
     # ── Aggregate Queries ─────────────────────────────────────────────────────
 

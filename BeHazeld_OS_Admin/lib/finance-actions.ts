@@ -241,3 +241,32 @@ export async function createJournalEntryAction(
     data: (await response.json()) as JournalEntryResponse,
   };
 }
+
+export async function reverseJournalEntryAction(
+  entryId: string,
+): Promise<FinanceActionResult<JournalEntryResponse>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/finance/journals/${entryId}/reverse`, {
+      method: 'POST',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to reverse journal entry.'),
+    };
+  }
+
+  return {
+    success: true,
+    data: (await response.json()) as JournalEntryResponse,
+  };
+}

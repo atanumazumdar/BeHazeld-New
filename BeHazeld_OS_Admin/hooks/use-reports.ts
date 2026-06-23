@@ -24,6 +24,7 @@ import {
   importJournalEntriesAction,
   listFinanceAccountsAction,
   listJournalEntriesAction,
+  reverseJournalEntryAction,
 } from '@/lib/finance-actions';
 import {
   getDashboardMetricsAction,
@@ -202,6 +203,24 @@ export function useCreateJournalEntry() {
     mutationFn: async (payload: CreateJournalEntryPayload): Promise<JournalEntryResponse> => {
       const result = await createJournalEntryAction(payload);
       return requireActionData(result, 'Failed to post journal entry.');
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: reportKeys.journals });
+      qc.invalidateQueries({ queryKey: reportKeys.trialBalance });
+      qc.invalidateQueries({ queryKey: reportKeys.pl() });
+      qc.refetchQueries({ queryKey: reportKeys.journals });
+      qc.refetchQueries({ queryKey: reportKeys.trialBalance });
+      qc.refetchQueries({ queryKey: reportKeys.pl() });
+    },
+  });
+}
+
+export function useReverseJournalEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (entryId: string): Promise<JournalEntryResponse> => {
+      const result = await reverseJournalEntryAction(entryId);
+      return requireActionData(result, 'Failed to reverse journal entry.');
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: reportKeys.journals });

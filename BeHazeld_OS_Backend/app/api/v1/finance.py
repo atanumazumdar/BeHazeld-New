@@ -9,6 +9,7 @@ POST /accounts/seed                    : finance.accounts.seed
 GET  /journals                         : finance.journals.view
 GET  /journals/{id}                    : finance.journals.view
 POST /journals                         : finance.journals.create
+POST /journals/{id}/reverse            : finance.journals.create
 GET  /reports/trial-balance            : finance.reports.view
 GET  /reports/profit-and-loss          : finance.reports.view
 """
@@ -172,6 +173,22 @@ def post_manual_journal(
         lines=lines,
         ref_id=body.ref_id,
     )
+
+
+@router.post(
+    "/journals/{entry_id}/reverse",
+    response_model=JournalEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def reverse_journal_entry(
+    entry_id: uuid.UUID,
+    ctx: TenantContext = Depends(require_permission("finance.journals.create")),
+    db: Session = Depends(get_db),
+) -> JournalEntryResponse:
+    """
+    Create an equal-and-opposite journal entry and mark the original reversed.
+    """
+    return FinanceService(db).reverse_journal_entry(ctx.tenant_id, entry_id)  # type: ignore[return-value]
 
 
 # ── Reports ───────────────────────────────────────────────────────────────────

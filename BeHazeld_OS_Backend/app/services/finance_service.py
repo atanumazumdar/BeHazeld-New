@@ -39,7 +39,7 @@ from decimal import Decimal
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import NotFoundError, UnbalancedJournalError
+from app.core.exceptions import NotFoundError, UnbalancedJournalError, ValidationError
 from app.db.base import Base
 from app.models.finance import AccountType, ChartOfAccount, JournalEntry, JournalLine, JournalRefType
 from app.repositories.finance_repository import FinanceRepository
@@ -485,6 +485,44 @@ class FinanceService:
             self.db.commit()
             self.db.refresh(entry)
             return entry
+        except Exception:
+            self.db.rollback()
+            raise
+
+    def reverse_journal_entry(
+        self,
+        tenant_id: uuid.UUID,
+        entry_id: uuid.UUID,
+    ):
+        """
+        Reverse a posted journal without mutating its original lines.
+
+        The original journal is marked ``reversed`` for UI/audit clarity, and a
+        new posted journal is created with each debit/credit leg swapped.
+        """
+        self.ensure_finance_tables_available()
+        original = self.repo.get_journal_entry_by_id(tenant_id, entry_id)
+        if original.status == "reversed":
+            raise ValidationError(f"Journal {original.entry_number} is already reversed")
+
+        reversal_lines = [
+            (line.account_id, line.credit_amount, line.debit_amount)
+            for line in original.lines
+        ]
+
+        try:
+            reversal = self.post_balanced_journal(
+                tenant_id=tenant_id,
+                description=f"Reversal of {original.entry_number}: {original.description}",
+                ref_type=JournalRefType.MANUAL,
+                entry_date=date.today(),
+                lines=reversal_lines,
+                ref_id=original.id,
+            )
+            self.repo.mark_journal_reversed(original)
+            self.db.commit()
+            self.db.refresh(reversal)
+            return reversal
         except Exception:
             self.db.rollback()
             raise
