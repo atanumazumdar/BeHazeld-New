@@ -1,22 +1,22 @@
 export type CheckoutPayload = {
   customer_email: string;
   customer_name: string;
+  customer_phone?: string;
   shipping_address: string;
   city: string;
   state: string;
   postal_code: string;
   country: string;
+  total_amount: string;
   items: {
-    product_id: string;
+    product_variant_id: string;
     quantity: number;
   }[];
 };
 
 export type CheckoutOrder = {
-  id: number;
-  status: string;
-  subtotal: string;
-  shipping_total: string;
-  total: string;
-  customer_email: string;
+  order_id: string;
+  total_amount: string;
+  order_summary: string;
+  whatsapp_message: string;
 };

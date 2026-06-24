@@ -14,6 +14,7 @@ GET  /{tenant_id}/products                   — paginated active products
 GET  /{tenant_id}/products/{product_id}      — single product + variants
 GET  /{tenant_id}/categories                 — category list (flat)
 GET  /{tenant_id}/product-groups             — product group / collection list
+POST /{tenant_id}/checkout                   — storefront checkout / WhatsApp order
 POST /{tenant_id}/customers/register         — customer self-registration
 
 Performance notes
@@ -24,22 +25,38 @@ Performance notes
   the list; full detail (with variants) is returned on GET /{product_id}.
 """
 import uuid
+from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, Query, Response, status
+from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ValidationError
 from app.db.session import get_db
+from app.models.catalog import ProductVariant
+from app.models.sales import Customer, SalePaymentMode
 from app.repositories.public_repository import PublicRepository
 from app.repositories.sales_repository import SalesRepository
 from app.schemas.public import (
     PaginatedProductsResponse,
     PublicCategoryResponse,
+    PublicCheckoutRequest,
+    PublicCheckoutResponse,
     PublicCustomerResponse,
     PublicProductGroupResponse,
     PublicProductResponse,
     PublicRegisterCustomerRequest,
     PublicVariantResponse,
 )
+from app.schemas.sales import (
+    CreateSaleBillLineRequest,
+    CreateSaleBillRequest,
+    CreateSalePaymentRequest,
+)
+from app.services.inventory_service import InventoryService
+from app.services.sales_service import SalesService
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -92,6 +109,90 @@ def _public_product_response(p, variants, stock_by_variant) -> PublicProductResp
             )
             for v in variants
         ],
+    )
+
+
+def _format_inr(amount: Decimal) -> str:
+    return f"{amount.quantize(Decimal('0.01')):,.2f}"
+
+
+def _format_checkout_address(body: PublicCheckoutRequest) -> str:
+    return ", ".join(
+        part
+        for part in [
+            body.shipping_address,
+            body.city,
+            body.state,
+            body.postal_code,
+            body.country,
+        ]
+        if part
+    )
+
+
+def _format_whatsapp_message(
+    *,
+    order_id: str,
+    customer_name: str,
+    items: list[tuple[str, str, str, int]],
+    total_amount: Decimal,
+    address: str,
+) -> str:
+    item_lines = "\n".join(
+        f"- {name} (Size: {size}, Color: {color}) x {quantity}"
+        for name, size, color, quantity in items
+    )
+    return (
+        "✨ New BeHazel'd Order ✨\n\n"
+        f"*Order ID:* #{order_id}\n"
+        f"Customer: {customer_name}\n"
+        "Items:\n"
+        f"{item_lines}\n\n"
+        f"Total Amount: ₹{_format_inr(total_amount)}\n"
+        f"Address: {address}\n\n"
+        "_Please confirm my order!_"
+    )
+
+
+def _get_or_create_public_customer(
+    db: Session,
+    *,
+    tenant_id: uuid.UUID,
+    name: str,
+    email: str | None,
+    phone: str | None,
+    address: str,
+) -> Customer:
+    customer = None
+    if email:
+        customer = db.scalar(
+            select(Customer).where(
+                Customer.tenant_id == tenant_id,
+                func.lower(Customer.email) == email.lower(),
+                Customer.is_active.is_(True),
+            )
+        )
+    if customer is None and phone:
+        customer = db.scalar(
+            select(Customer).where(
+                Customer.tenant_id == tenant_id,
+                Customer.phone == phone,
+                Customer.is_active.is_(True),
+            )
+        )
+    if customer is not None:
+        customer.name = name
+        customer.email = email or customer.email
+        customer.phone = phone or customer.phone
+        customer.address = address
+        db.flush()
+        return customer
+    return SalesRepository(db).create_customer(
+        tenant_id=tenant_id,
+        name=name,
+        email=email,
+        phone=phone,
+        address=address,
     )
 
 
@@ -188,6 +289,125 @@ def get_public_product(
     )
 
     return _public_product_response(product, variants, stock_by_variant)
+
+
+# ── Checkout ─────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/{tenant_id}/checkout",
+    response_model=PublicCheckoutResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def public_checkout(
+    tenant_id: uuid.UUID,
+    body: PublicCheckoutRequest,
+    db: Session = Depends(get_db),
+) -> PublicCheckoutResponse:
+    """
+    Save a storefront order as a confirmed sale before the customer is redirected
+    to WhatsApp for human confirmation.
+    """
+    service = SalesService(db)
+    service.ensure_sales_tables_available()
+    InventoryService(db).ensure_inventory_tables_available()
+    address = _format_checkout_address(body)
+
+    summary_items: list[tuple[str, str, str, int]] = []
+    line_requests: list[CreateSaleBillLineRequest] = []
+    server_total = Decimal("0")
+
+    for item in body.items:
+        variant = db.scalar(
+            select(ProductVariant)
+            .options(
+                selectinload(ProductVariant.product),
+                selectinload(ProductVariant.size),
+                selectinload(ProductVariant.color),
+            )
+            .where(
+                ProductVariant.tenant_id == tenant_id,
+                ProductVariant.id == item.product_variant_id,
+                ProductVariant.status == "active",
+            )
+        )
+        if variant is None:
+            raise ValidationError(f"Variant {item.product_variant_id} is not available")
+        quantity = Decimal(item.quantity)
+        price = Decimal(str(variant.selling_price)).quantize(Decimal("0.01"))
+        server_total += (quantity * price).quantize(Decimal("0.01"))
+        line_requests.append(
+            CreateSaleBillLineRequest(
+                product_variant_id=variant.id,
+                quantity=quantity,
+                selling_price=price,
+                tax_rate=Decimal("0"),
+                discount_amount=Decimal("0"),
+            )
+        )
+        summary_items.append(
+            (
+                variant.product.name,
+                variant.size.name,
+                variant.color.name,
+                item.quantity,
+            )
+        )
+
+    # Do not trust the browser for billing; use server prices. This accepts small
+    # decimal/string formatting differences but rejects materially stale carts.
+    if abs(server_total - body.total_amount) > Decimal("0.01"):
+        raise ValidationError(
+            f"Cart total changed. Expected ₹{_format_inr(server_total)}; received ₹{_format_inr(body.total_amount)}"
+        )
+
+    try:
+        customer = _get_or_create_public_customer(
+            db,
+            tenant_id=tenant_id,
+            name=body.customer_name,
+            email=str(body.customer_email) if body.customer_email else None,
+            phone=body.customer_phone,
+            address=address,
+        )
+        location, bin_obj = service._default_sale_location_bin(tenant_id)
+        sequence = SalesRepository(db).count_bills_by_tenant(tenant_id) + 1
+        order_id = f"BEH-{1000 + sequence}"
+        sale_request = CreateSaleBillRequest(
+            location_id=location.id,
+            bin_id=bin_obj.id,
+            bill_date=date.today(),
+            customer_id=customer.id,
+            notes=f"Website order via WhatsApp. Ship to: {address}",
+            lines=line_requests,
+            payment=CreateSalePaymentRequest(
+                amount=server_total,
+                payment_mode=SalePaymentMode.OTHER,
+                notes="Website order pending WhatsApp confirmation/payment",
+            ),
+        )
+        bill, _metadata = service.create_sale(
+            tenant_id=tenant_id,
+            req=sale_request,
+            invoice_number_override=order_id,
+            generate_pdf=False,
+        )
+    except Exception:
+        db.rollback()
+        raise
+
+    whatsapp_message = _format_whatsapp_message(
+        order_id=bill.invoice_number,
+        customer_name=body.customer_name,
+        items=summary_items,
+        total_amount=server_total,
+        address=address,
+    )
+    return PublicCheckoutResponse(
+        order_id=bill.invoice_number,
+        total_amount=server_total,
+        order_summary=whatsapp_message,
+        whatsapp_message=whatsapp_message,
+    )
 
 
 # ── Categories ────────────────────────────────────────────────────────────────
