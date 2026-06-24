@@ -1,1 +1,1 @@
-railway redeploy marker: expose 8080
+railway redeploy marker: restore port 8000 after schema helper fix
