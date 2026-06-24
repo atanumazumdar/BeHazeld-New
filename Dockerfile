@@ -22,8 +22,8 @@ COPY . .
 # Set the PYTHONPATH so Python can find the 'app' module inside the sub-folder
 ENV PYTHONPATH=/app/BeHazeld_OS_Backend
 
-# Expose the port the app runs on
-EXPOSE 8000
+# Railway routes to the exposed container port; its Python service PORT is 8080.
+EXPOSE 8080
 
 # Start the application using uvicorn.
 # Railway injects PORT dynamically; fall back to 8000 for local Docker runs.
