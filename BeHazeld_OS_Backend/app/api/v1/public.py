@@ -134,22 +134,29 @@ def _format_whatsapp_message(
     *,
     order_id: str,
     customer_name: str,
-    items: list[tuple[str, str, str, int]],
+    items: list[tuple[str, str, str, str, str | None, int]],
     total_amount: Decimal,
     address: str,
 ) -> str:
     item_lines = "\n".join(
-        f"- {name} (Size: {size}, Color: {color}) x {quantity}"
-        for name, size, color, quantity in items
+        "\n".join(
+            [
+                f"- {name}",
+                f"  SKU: {sku_code}",
+                f"  Size: {size} | Color: {color} | Qty: {quantity}",
+                f"  Picture: {image_url}" if image_url else "  Picture: Not uploaded yet",
+            ]
+        )
+        for name, sku_code, size, color, image_url, quantity in items
     )
     return (
         "✨ New BeHazel'd Order ✨\n\n"
         f"*Order ID:* #{order_id}\n"
-        f"Customer: {customer_name}\n"
+        f"*Buyer:* {customer_name}\n"
+        f"*Address:* {address}\n\n"
         "Items:\n"
         f"{item_lines}\n\n"
         f"Total Amount: ₹{_format_inr(total_amount)}\n"
-        f"Address: {address}\n\n"
         "_Please confirm my order!_"
     )
 
@@ -312,7 +319,7 @@ def public_checkout(
     InventoryService(db).ensure_inventory_tables_available()
     address = _format_checkout_address(body)
 
-    summary_items: list[tuple[str, str, str, int]] = []
+    summary_items: list[tuple[str, str, str, str, str | None, int]] = []
     line_requests: list[CreateSaleBillLineRequest] = []
     server_total = Decimal("0")
 
@@ -347,8 +354,10 @@ def public_checkout(
         summary_items.append(
             (
                 variant.product.name,
+                variant.sku_code,
                 variant.size.name,
                 variant.color.name,
+                variant.image_url or variant.product.image_url,
                 item.quantity,
             )
         )
