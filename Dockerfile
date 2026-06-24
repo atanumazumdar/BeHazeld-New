@@ -25,6 +25,6 @@ ENV PYTHONPATH=/app/BeHazeld_OS_Backend
 # Expose the port the app runs on
 EXPOSE 8000
 
-# Start the application using uvicorn
-# We point directly to the app.main:app inside the sub-folder
-CMD ["uvicorn", "BeHazeld_OS_Backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start the application using uvicorn.
+# Railway injects PORT dynamically; fall back to 8000 for local Docker runs.
+CMD ["sh", "-c", "uvicorn BeHazeld_OS_Backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
