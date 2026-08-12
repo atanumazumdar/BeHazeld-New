@@ -120,6 +120,10 @@ export async function getCollection(
       products: matchedProducts,
     };
   } catch {
-    return null;
+    if (!STOREFRONT_COLLECTIONS[slug]) return null;
+    return {
+      ...storefrontCollection(slug),
+      products: [],
+    };
   }
 }

@@ -35,10 +35,18 @@ export const useCartStore = create<CartState>()(
           );
 
           if (existingIdx >= 0) {
+            const refreshedImage = variant ? variant.image_url ?? "" : cardImageUrl(product);
             return {
               items: state.items.map((item, idx) =>
                 idx === existingIdx
-                  ? { ...item, quantity: item.quantity + 1 }
+                  ? {
+                      ...item,
+                      sku: variant?.sku ?? item.sku,
+                      imageUrl: refreshedImage,
+                      color: variant?.color ?? item.color,
+                      size: variant?.size ?? item.size,
+                      quantity: item.quantity + 1,
+                    }
                   : item,
               ),
             };
@@ -54,7 +62,7 @@ export const useCartStore = create<CartState>()(
             sku:       variant?.sku ?? "",
             slug:      product.slug,
             name:      product.name,
-            imageUrl:  cardImageUrl(product),
+            imageUrl:  variant ? variant.image_url ?? "" : cardImageUrl(product),
             price:     effectivePrice,
             color:     variant?.color ?? "—",
             size:      variant?.size  ?? "—",

@@ -23,7 +23,9 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   );
 
   const isSoldOut    = product.total_stock === 0;
-  const imgUrl       = selectedVariant?.image_url ?? cardImg(product.primary_image);
+  const imgUrl       = selectedVariant
+    ? selectedVariant.image_url ?? ""
+    : cardImg(product.primary_image);
   const displayPrice = selectedVariant
     ? variantPrice(product, selectedVariant)
     : Number(product.min_price);
@@ -35,13 +37,14 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   const activeColor = selectedVariant?.color ?? colors[0] ?? "";
 
   const picLabel = `Pic ${index + 1}`;
+  const productHref = `/products/${encodeURIComponent(product.slug)}`;
 
   return (
     <article style={{ display: "flex", flexDirection: "column", width: 350 }}>
 
       {/* ── Single portrait image ──────────────────────────────── */}
       <a
-        href={`/products/${product.slug}`}
+        href={productHref}
         aria-label={`View ${product.name}`}
         className="block group"
       >
@@ -127,7 +130,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
       >
         {/* Name + price */}
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
-          <a href={`/products/${product.slug}`} style={{ flex: 1, minWidth: 0 }}>
+          <a href={productHref} style={{ flex: 1, minWidth: 0 }}>
             <h2
               className="font-serif font-normal leading-snug hover:text-[#8B6914] transition-colors"
               style={{
@@ -208,7 +211,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
           </p>
         )}
 
-        <AddToCartButton product={product} selectedVariant={selectedVariant} />
+        <AddToCartButton product={product} selectedVariant={selectedVariant} compact />
       </div>
     </article>
   );

@@ -57,6 +57,7 @@ function GoldRule({ delay }: { delay: number }) {
 
 export default function OurStoryPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const replayTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isMuted, setIsMuted] = useState(true);
 
   useEffect(() => {
@@ -64,8 +65,16 @@ export default function OurStoryPage() {
 
     if (!video) return;
 
-    video.muted = true;
+    video.muted = isMuted;
     playVideo(video);
+  }, [isMuted]);
+
+  useEffect(() => {
+    return () => {
+      if (replayTimeoutRef.current) {
+        clearTimeout(replayTimeoutRef.current);
+      }
+    };
   }, []);
 
   const toggleMusic = () => {
@@ -80,6 +89,22 @@ export default function OurStoryPage() {
     if (!nextMuted) {
       playVideo(video);
     }
+  };
+
+  const handleVideoEnded = () => {
+    const video = videoRef.current;
+
+    if (!video) return;
+
+    if (replayTimeoutRef.current) {
+      clearTimeout(replayTimeoutRef.current);
+    }
+
+    replayTimeoutRef.current = setTimeout(() => {
+      video.currentTime = 0;
+      playVideo(video);
+      replayTimeoutRef.current = null;
+    }, 3000);
   };
 
   return (
@@ -115,23 +140,31 @@ export default function OurStoryPage() {
           >
             <div className="absolute pointer-events-none"
               style={{ inset: "-24%", borderRadius: "50%", background: "radial-gradient(circle, rgba(192,147,48,0.20) 0%, transparent 65%)", filter: "blur(32px)" }} />
-            <video
-              ref={videoRef}
-              src="/animated-logo.mp4"
-              aria-label="BeHAZEL'd animated logo"
-              autoPlay
-              muted={isMuted}
-              loop
-              playsInline
-              onEnded={(event) => {
-                event.currentTarget.currentTime = 0;
-                playVideo(event.currentTarget);
-              }}
-              style={{
-                width: "clamp(200px, 80%, 600px)", display: "block", margin: "0 auto",
-                filter: "brightness(1.85) contrast(1.12) saturate(1.35) drop-shadow(0 22px 60px rgba(192,147,48,0.34)) drop-shadow(0 4px 14px rgba(0,0,0,0.65))",
-              }}
-            />
+            <div
+              className="relative mx-auto"
+              style={{ width: "clamp(200px, 80%, 600px)" }}
+            >
+              <video
+                ref={videoRef}
+                src="/AnimatedLogoFinal.mp4"
+                aria-label="BeHAZEL'd animated logo"
+                autoPlay
+                muted={isMuted}
+                playsInline
+                onEnded={handleVideoEnded}
+                style={{
+                  width: "100%", display: "block", margin: "0 auto",
+                  filter: "brightness(1.12) contrast(0.82) saturate(0.96) sepia(0.12) drop-shadow(0 18px 44px rgba(192,147,48,0.18)) drop-shadow(0 4px 10px rgba(0,0,0,0.44))",
+                }}
+              />
+              <div
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background: "rgba(226, 204, 156, 0.16)",
+                  mixBlendMode: "multiply",
+                }}
+              />
+            </div>
           </motion.div>
         </motion.div>
 
@@ -201,7 +234,7 @@ export default function OurStoryPage() {
           {/* Brand statement */}
           <motion.p {...up(1.2)} className="font-sans font-light mb-3"
             style={{ ...BODY, color: "rgba(248,240,232,0.80)" }}>
-            <span style={{ color: "#C09330", fontWeight: 400 }}>BeHAZEL&apos;d</span> is not just a label. It is a story — Hazel&apos;s story.
+            <span style={{ color: "#C09330", fontWeight: 400 }}>BeHAZEL&apos;d</span>{" "}is not just a label. It is a story — Hazel&apos;s story.
           </motion.p>
 
           {/* Body §1 */}

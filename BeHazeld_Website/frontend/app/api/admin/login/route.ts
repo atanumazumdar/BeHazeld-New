@@ -15,6 +15,7 @@ const ADMIN_KEY = process.env.ADMIN_API_KEY ?? "change-me-before-production";
 const attempts = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS     = 15 * 60 * 1000;  // 15 minutes
 const MAX_ATTEMPTS  = 10;
+const MAX_PASSWORD_LENGTH = 128;
 
 function checkRateLimit(ip: string): boolean {
   const now    = Date.now();
@@ -53,6 +54,10 @@ export async function POST(req: NextRequest) {
   // Constant-time comparison to prevent timing attacks
   const expected = ADMIN_KEY;
   const received = password ?? "";
+  if (received.length > MAX_PASSWORD_LENGTH) {
+    return NextResponse.json({ error: "Password is too long" }, { status: 400 });
+  }
+
   let diff = expected.length !== received.length ? 1 : 0;
   for (let i = 0; i < Math.max(expected.length, received.length); i++) {
     diff |= (expected.charCodeAt(i) || 0) ^ (received.charCodeAt(i) || 0);

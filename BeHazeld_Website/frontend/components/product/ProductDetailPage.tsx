@@ -22,10 +22,11 @@ export function ProductDetailPage({ product }: { product: ProductDetail }) {
   const displayMrp = Number(selectedVariant?.mrp ?? displayPrice);
   const hasMarkdown = selectedVariant ? displayMrp > displayPrice : false;
 
-  const heroImage = selectedVariant?.image_url
-    ?? product.primary_image?.transform_urls?.detail
-    ?? product.primary_image?.url
-    ?? "";
+  const heroImage = selectedVariant
+    ? selectedVariant.image_url ?? ""
+    : product.primary_image?.transform_urls?.detail
+      ?? product.primary_image?.url
+      ?? "";
 
   return (
     <main>

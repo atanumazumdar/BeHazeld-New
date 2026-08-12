@@ -85,6 +85,7 @@ function LoginForm() {
                 ref={inputRef}
                 type="password"
                 required
+                maxLength={128}
                 autoFocus
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { formatCurrency } from "@/lib/format";
 import { useCartStore } from "@/store/cartStore";
@@ -18,11 +19,31 @@ function Diamond() {
 }
 
 export function CartView() {
+  const [hasMounted, setHasMounted] = useState(false);
   const items        = useCartStore((s) => s.items);
   const removeItem   = useCartStore((s) => s.removeItem);
   const updateQty    = useCartStore((s) => s.updateQuantity);
   const clearCart    = useCartStore((s) => s.clearCart);
   const subtotal     = useCartStore((s) => s.getSubtotal());
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return (
+      <div className="glass-panel px-6 py-16 text-center max-w-lg mx-auto">
+        <Diamond />
+        <h1
+          className="font-serif text-3xl font-light italic"
+          style={{ color: CREAM }}
+        >
+          Loading your atelier bag...
+        </h1>
+        <Diamond />
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -52,16 +73,33 @@ export function CartView() {
       <section aria-label="Cart items" className="space-y-5">
         {items.map((item) => (
           <article
-            key={item.productId}
+            key={`${item.productId}:${item.variantId ?? "no-variant"}`}
             className="grid grid-cols-[96px_1fr] gap-5 pb-5"
             style={{ borderBottom: "1px solid rgba(192,147,48,0.15)" }}
           >
-            <img
-              src={item.imageUrl}
-              alt={item.name}
-              className="aspect-[3/4] object-cover object-top"
-              style={{ filter: "brightness(0.92)" }}
-            />
+            {item.imageUrl ? (
+              <img
+                src={item.imageUrl}
+                alt={item.name}
+                className="aspect-[3/4] object-cover object-top"
+                style={{ filter: "brightness(0.92)" }}
+              />
+            ) : (
+              <div
+                className="aspect-[3/4] flex items-center justify-center"
+                style={{
+                  background: "linear-gradient(145deg, #E4DBCE 0%, #D4C8B4 100%)",
+                  border: "1px solid rgba(192,147,48,0.22)",
+                }}
+              >
+                <span
+                  className="font-sans text-[9px] font-light uppercase tracking-[0.24em]"
+                  style={{ color: "rgba(100,70,20,0.42)" }}
+                >
+                  Photo
+                </span>
+              </div>
+            )}
             <div className="min-w-0">
               <div className="flex items-start justify-between gap-4">
                 <div>

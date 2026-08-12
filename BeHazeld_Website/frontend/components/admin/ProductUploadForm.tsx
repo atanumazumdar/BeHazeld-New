@@ -464,7 +464,7 @@ export function ProductUploadForm({ showAlways = false }: { showAlways?: boolean
                 {message}
                 {status === "success" && createdSlug && (
                   <a
-                    href={`/products/${createdSlug}`}
+                    href={`/products/${encodeURIComponent(createdSlug)}`}
                     className="block mt-2 font-sans font-light uppercase transition-colors"
                     style={{ fontSize: 9, letterSpacing: "0.36em", color: GOLD }}
                   >
