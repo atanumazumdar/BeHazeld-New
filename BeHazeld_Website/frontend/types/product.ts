@@ -79,7 +79,7 @@ export function variantPrice(
   return Number(product.base_price) + Number(variant.price_adjustment);
 }
 
-/** Best card image URL: Cloudinary card transform → url → empty string */
+/** Best card image URL: public image URL → empty string */
 export function cardImageUrl(product: Pick<Product, "primary_image">): string {
   if (!product.primary_image) return "";
   return product.primary_image.transform_urls?.card || product.primary_image.url;

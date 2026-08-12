@@ -13,12 +13,9 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     UPLOAD_STORAGE_PROVIDER: str = "local"
     UPLOAD_LOCAL_PATH: str = "./var/uploads"
+    PUBLIC_BASE_URL: str = "http://127.0.0.1:8000"
     INVOICE_STORAGE_PATH: str = "./var/invoices"
-    AZURE_STORAGE_CONNECTION_STRING: str = ""
-    AZURE_STORAGE_CONTAINER: str = ""
-    CLOUDINARY_CLOUD_NAME: str = ""
-    CLOUDINARY_API_KEY: str = ""
-    CLOUDINARY_API_SECRET: str = ""
+    MAX_REQUEST_BODY_BYTES: int = 10 * 1024 * 1024
     # Stored as comma-separated string; use .ALLOWED_ORIGINS for the list
     ALLOWED_ORIGINS_RAW: str = "http://localhost:3000"
 

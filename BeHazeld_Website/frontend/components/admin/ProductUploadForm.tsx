@@ -126,7 +126,6 @@ export function ProductUploadForm({ showAlways = false }: { showAlways?: boolean
       if (!prodRes.ok) throw new Error(prodData.error ?? "Product creation failed");
 
       const productId = prodData.productId;
-      let usingPlaceholder = false;
       setCreatedSlug(prodData.slug);
       setMessage(`Product created. Uploading images…`);
 
@@ -146,17 +145,12 @@ export function ProductUploadForm({ showAlways = false }: { showAlways?: boolean
         const imgRes = await fetch("/api/admin/images", { method: "POST", body: fd });
         const imgData = await imgRes.json();
         if (!imgRes.ok) throw new Error(imgData.error ?? `Image ${index + 1} upload failed`);
-        // Flag if Cloudinary isn't set up (photo saved as placeholder)
-        if (imgData.cloudinary === false) usingPlaceholder = true;
       }
 
       setStatus("success");
       const collectionLabel = COLLECTIONS.find(c => c.slug === collection)?.label;
       setMessage(
-        `"${name}" added to ${collectionLabel}. It will appear on the collection page within 60 seconds.` +
-        (usingPlaceholder
-          ? "\n\nNote: Photos saved as placeholders — add Cloudinary credentials to .env.local to store real images."
-          : "")
+        `"${name}" added to ${collectionLabel}. It will appear on the collection page within 60 seconds.`
       );
 
       /* Reset form */
@@ -365,12 +359,7 @@ export function ProductUploadForm({ showAlways = false }: { showAlways?: boolean
               <Label>Product Photos (upload 2)</Label>
               <p className="font-sans font-light mb-3"
                 style={{ fontSize: 10, color: "rgba(177,152,112,0.5)", letterSpacing: "0.02em" }}>
-                JPG · PNG · WebP · max 10 MB each.{" "}
-                {!process.env.NEXT_PUBLIC_CLOUDINARY_CONFIGURED && (
-                  <span style={{ color: "rgba(192,147,48,0.55)" }}>
-                    Cloudinary not configured — photos will be saved as placeholders until credentials are added to .env.local.
-                  </span>
-                )}
+                JPG · PNG · WebP · max 10 MB each. Photos are stored on the BeHazeld Windows server.
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 {([0, 1] as const).map((idx) => (

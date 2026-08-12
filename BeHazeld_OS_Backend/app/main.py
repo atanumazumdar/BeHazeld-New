@@ -8,18 +8,21 @@ exception types added to core/exceptions.py are automatically covered.
 """
 import uuid
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from pathlib import Path
+from typing import Any, AsyncGenerator
 
 import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.v1 import admin, audit, auth, catalog, finance, inventory, purchases, reports, sales
 from app.api.v1 import public as public_api
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.middleware.audit_middleware import AuditMiddleware
+from app.middleware.body_limit_middleware import BodyLimitMiddleware
 
 logger = structlog.get_logger(__name__)
 
@@ -53,6 +56,11 @@ app.add_middleware(
 # Audit middleware — logs every POST/PATCH/PUT/DELETE to audit.activity_log.
 # Registered AFTER CORS so the audit captures the actual HTTP status.
 app.add_middleware(AuditMiddleware)
+app.add_middleware(BodyLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES)
+
+uploads_path = Path(settings.UPLOAD_LOCAL_PATH).expanduser().resolve()
+uploads_path.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(uploads_path)), name="uploads")
 
 # ── Exception handlers ────────────────────────────────────────────────────────
 
@@ -98,25 +106,65 @@ async def unhandled_error_handler(request: Request, exc: Exception) -> JSONRespo
 # ── Health ────────────────────────────────────────────────────────────────────
 
 @app.get("/health", tags=["health"])
-def health_check() -> dict:
-    return {"status": "ok", "app": settings.APP_NAME, "env": settings.APP_ENV}
+def health_check() -> JSONResponse:
+    checks = {
+        "database": _check_database(),
+        "uploads": _check_uploads(),
+    }
+    is_healthy = all(check["status"] in {"ok", "skipped"} for check in checks.values())
+    status_code = 200 if is_healthy else 503
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if is_healthy else "error",
+            "app": settings.APP_NAME,
+            "env": settings.APP_ENV,
+            "checks": checks,
+        },
+    )
 
 
 @app.get("/health/db", tags=["health"])
-def db_health_check() -> dict:
+def db_health_check() -> JSONResponse:
     """Verifies the database engine can open a connection."""
+    result = _check_database()
+    return JSONResponse(
+        status_code=200 if result["status"] == "ok" else 503,
+        content=result,
+    )
+
+
+@app.get("/health/uploads", tags=["health"])
+def uploads_health_check() -> JSONResponse:
+    """Verifies local image upload storage is writable."""
+    result = _check_uploads()
+    status_code = 200 if result["status"] == "ok" else 503
+    return JSONResponse(status_code=status_code, content=result)
+
+
+def _check_database() -> dict[str, Any]:
     from sqlalchemy import text
     from app.db.session import engine
+
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected"}
     except Exception as exc:  # noqa: BLE001
-        logger.error("db_health_check_failed", error=str(exc))
-        return JSONResponse(  # type: ignore[return-value]
-            status_code=503,
-            content={"status": "error", "database": "unreachable", "detail": str(exc)},
-        )
+        logger.error("health_database_failed", error=str(exc))
+        return {"status": "error", "database": "unreachable", "detail": str(exc)}
+
+
+def _check_uploads() -> dict[str, Any]:
+    try:
+        uploads_path.mkdir(parents=True, exist_ok=True)
+        probe = uploads_path / ".healthcheck"
+        probe.write_text("ok", encoding="utf-8")
+        probe.unlink(missing_ok=True)
+        return {"status": "ok", "uploads": "writable", "path": str(uploads_path)}
+    except Exception as exc:  # noqa: BLE001
+        logger.error("health_uploads_failed", error=str(exc))
+        return {"status": "error", "uploads": "unwritable", "detail": str(exc)}
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 

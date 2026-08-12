@@ -1,32 +1,26 @@
 from __future__ import annotations
 
+import shutil
 import uuid
+from pathlib import Path
 from typing import BinaryIO
-
-import cloudinary
-import cloudinary.uploader
 
 from app.core.config import settings
 from app.core.exceptions import ValidationError
 
 
+ALLOWED_IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
+
 class ImageService:
-    """Uploads product imagery to Cloudinary and returns public HTTPS URLs."""
+    """Stores product imagery on the local server and returns public URLs."""
 
     def __init__(self) -> None:
-        if not (
-            settings.CLOUDINARY_CLOUD_NAME
-            and settings.CLOUDINARY_API_KEY
-            and settings.CLOUDINARY_API_SECRET
-        ):
-            raise ValidationError("Cloudinary credentials are not configured")
+        if settings.UPLOAD_STORAGE_PROVIDER.lower() != "local":
+            raise ValidationError("Only local image storage is enabled on this server")
 
-        cloudinary.config(
-            cloud_name=settings.CLOUDINARY_CLOUD_NAME,
-            api_key=settings.CLOUDINARY_API_KEY,
-            api_secret=settings.CLOUDINARY_API_SECRET,
-            secure=True,
-        )
+        self.upload_root = Path(settings.UPLOAD_LOCAL_PATH).expanduser().resolve()
+        self.public_base_url = settings.PUBLIC_BASE_URL.rstrip("/")
 
     def upload_product_image(
         self,
@@ -36,21 +30,12 @@ class ImageService:
         product_id: uuid.UUID,
         filename: str | None = None,
     ) -> str:
-        public_id = f"{product_id}"
-        if filename:
-            public_id = f"{product_id}-{filename.rsplit('.', 1)[0]}"
-
-        result = cloudinary.uploader.upload(
+        return self._save_image(
             file,
-            folder=f"behazeld/{tenant_id}/products",
-            public_id=public_id,
-            overwrite=True,
-            resource_type="image",
+            relative_dir=Path(str(tenant_id)) / "products" / str(product_id),
+            filename=filename,
+            fallback_stem=str(product_id),
         )
-        secure_url = result.get("secure_url")
-        if not secure_url:
-            raise ValidationError("Cloudinary upload did not return a secure URL")
-        return str(secure_url)
 
     def upload_variant_image(
         self,
@@ -61,18 +46,38 @@ class ImageService:
         variant_id: uuid.UUID,
         filename: str | None = None,
     ) -> str:
-        public_id = f"{variant_id}"
-        if filename:
-            public_id = f"{variant_id}-{filename.rsplit('.', 1)[0]}"
-
-        result = cloudinary.uploader.upload(
+        return self._save_image(
             file,
-            folder=f"behazeld/{tenant_id}/products/{product_id}/variants",
-            public_id=public_id,
-            overwrite=True,
-            resource_type="image",
+            relative_dir=Path(str(tenant_id)) / "products" / str(product_id) / "variants",
+            filename=filename,
+            fallback_stem=str(variant_id),
         )
-        secure_url = result.get("secure_url")
-        if not secure_url:
-            raise ValidationError("Cloudinary upload did not return a secure URL")
-        return str(secure_url)
+
+    def _save_image(
+        self,
+        file: BinaryIO,
+        *,
+        relative_dir: Path,
+        filename: str | None,
+        fallback_stem: str,
+    ) -> str:
+        extension = self._safe_extension(filename)
+        saved_name = f"{fallback_stem}{extension}"
+        target_dir = self.upload_root / relative_dir
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        target_path = target_dir / saved_name
+        file.seek(0)
+        with target_path.open("wb") as output:
+            shutil.copyfileobj(file, output)
+
+        public_path = "/".join(["uploads", *relative_dir.parts, saved_name])
+        return f"{self.public_base_url}/{public_path}"
+
+    def _safe_extension(self, filename: str | None) -> str:
+        extension = Path(filename or "").suffix.lower()
+        if not extension:
+            extension = ".jpg"
+        if extension not in ALLOWED_IMAGE_EXTENSIONS:
+            raise ValidationError("Unsupported image file type")
+        return extension

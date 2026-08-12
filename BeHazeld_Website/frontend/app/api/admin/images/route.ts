@@ -3,7 +3,7 @@
  *
  * Protected by middleware (session cookie — no password in form data).
  * Receives multipart/form-data with: file, productId, isPrimary, displayOrder, altText
- * Proxies to FastAPI. Falls back to placeholder if Cloudinary is not configured.
+ * Proxies to FastAPI local image storage.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -49,29 +49,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!upRes.ok) {
-      // Cloudinary not configured — attach a branded placeholder instead
-      if (upRes.status === 503) {
-        const placeholder = `https://placehold.co/900x1200/3d2314/c09330?text=Image+Uploading`;
-        const fallback = await fetch(`${API}/admin/products/${productId}/images`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-          body: JSON.stringify({
-            url: placeholder, alt_text: altText || "Product image",
-            display_order: displayOrder, is_primary: isPrimary,
-          }),
-        });
-        if (fallback.ok) {
-          return NextResponse.json({
-            ...(await fallback.json()), cloudinary: false,
-            note: "Cloudinary not configured — placeholder used.",
-          });
-        }
-      }
       const err = await upRes.json().catch(() => ({ detail: upRes.statusText }));
       return NextResponse.json({ error: err.detail ?? "Upload failed" }, { status: upRes.status });
     }
 
-    return NextResponse.json({ ...(await upRes.json()), cloudinary: true });
+    return NextResponse.json({ ...(await upRes.json()), storage: "local" });
   } catch (err) {
     console.error("[api/admin/images]", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

@@ -13,7 +13,7 @@ def test_settings_loads_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 30
     assert settings.REFRESH_TOKEN_EXPIRE_DAYS == 7
     assert settings.UPLOAD_STORAGE_PROVIDER == "local"
-    assert settings.CLOUDINARY_CLOUD_NAME == ""
+    assert settings.PUBLIC_BASE_URL == "http://127.0.0.1:8000"
 
 
 def test_settings_allowed_origins_parses_csv(monkeypatch: pytest.MonkeyPatch) -> None:
