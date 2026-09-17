@@ -15,6 +15,7 @@ import { apiClient } from '@/lib/api-client';
 import {
   createCustomerAction,
   createSaleBillAction,
+  getInvoicePdfAction,
   getSalesBillAction,
   importSalesInvoicesAction,
   listCustomersAction,
@@ -27,8 +28,6 @@ import type {
   SaleBillResponse,
   SalesInvoiceImportResponse,
 } from '@/types/sales';
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 interface ActionResult<T> {
   success: boolean;
@@ -158,26 +157,29 @@ export function useImportSalesInvoices() {
 
 // ── PDF helpers (imperative, not hooks) ──────────────────────────────────────
 
+function invoicePdfBlob(base64: string): Blob {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: 'application/pdf' });
+}
+
 /**
  * Stream the invoice PDF from the API and trigger a browser download.
  * Returns `true` on success, `false` on failure.
  */
 export async function downloadInvoicePdf(billId: string): Promise<boolean> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/api/v1/sales/bills/${billId}/pdf`,
-      { credentials: 'include' },
-    );
-    if (!response.ok) return false;
+    const result = await getInvoicePdfAction(billId);
+    if (!result.success || !result.data) return false;
 
-    const blob = await response.blob();
+    const blob = invoicePdfBlob(result.data.base64);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    // Extract filename from Content-Disposition if present
-    const cd = response.headers.get('Content-Disposition') ?? '';
-    const match = cd.match(/filename=([^\s;]+)/);
-    a.download = match?.[1] ?? `invoice-${billId}.pdf`;
+    a.download = result.data.filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -194,12 +196,9 @@ export async function downloadInvoicePdf(billId: string): Promise<boolean> {
  */
 export async function getInvoicePreviewUrl(billId: string): Promise<string | null> {
   try {
-    const response = await fetch(
-      `${BASE_URL}/api/v1/sales/bills/${billId}/pdf`,
-      { credentials: 'include' },
-    );
-    if (!response.ok) return null;
-    const blob = await response.blob();
+    const result = await getInvoicePdfAction(billId);
+    if (!result.success || !result.data) return null;
+    const blob = invoicePdfBlob(result.data.base64);
     return URL.createObjectURL(blob);
   } catch {
     return null;

@@ -145,8 +145,8 @@ export function AddVariantDialog({ product, open, onOpenChange }: AddVariantDial
             <div>Size</div>
             <div>Color</div>
             <div>MRP</div>
-            <div>Sell Price</div>
-            <div>Cost</div>
+            <div>Sell before GST</div>
+            <div>Cost before GST</div>
             <div>Fabric</div>
             <div>Photo</div>
             <div />

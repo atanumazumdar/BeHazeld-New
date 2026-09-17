@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table';
 import { useDebounce } from 'use-debounce';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
+import { addGst, skuNetMargin, skuNetProfit } from '@/lib/pricing';
 
 function formatWholeAmount(value: string | null | undefined): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -44,17 +45,21 @@ function formatCurrencyAmount(value: string | null | undefined): string {
   return amount === '—' ? amount : `₹${amount}`;
 }
 
-function formatMarginPercent(costPrice: string | null | undefined, sellingPrice: string | null | undefined): string {
+function formatProfit(costPrice: string | null | undefined, sellingPrice: string | null | undefined): string {
   const cost = Number(costPrice);
   const sell = Number(sellingPrice);
-
-  if (!Number.isFinite(cost) || !Number.isFinite(sell) || cost <= 0) return '—';
-
-  const margin = ((sell - cost) / cost) * 100;
-  return `${margin.toLocaleString('en-IN', {
+  if (!Number.isFinite(cost) || !Number.isFinite(sell)) return '—';
+  const profit = skuNetProfit(cost, sell);
+  const margin = skuNetMargin(cost, sell);
+  return `₹${profit.toLocaleString('en-IN', { maximumFractionDigits: 2 })} (${margin.toLocaleString('en-IN', {
     maximumFractionDigits: 0,
     minimumFractionDigits: 0,
-  })}%`;
+  })}%)`;
+}
+
+function formatGstInclusive(value: string | null | undefined): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? `₹${addGst(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : '—';
 }
 
 export default function InventoryPage() {
@@ -173,9 +178,9 @@ export default function InventoryPage() {
               <TableHead className="text-stone-600 font-medium">Product</TableHead>
               <TableHead className="text-stone-600 font-medium">Status</TableHead>
               <TableHead className="text-stone-600 font-medium text-right">MRP</TableHead>
-              <TableHead className="text-stone-600 font-medium text-right">Cost</TableHead>
-              <TableHead className="text-stone-600 font-medium text-right">Sell</TableHead>
-              <TableHead className="text-stone-600 font-medium text-right">Margin</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Cost incl. GST</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Final Sell</TableHead>
+              <TableHead className="text-stone-600 font-medium text-right">Net Profit</TableHead>
               <TableHead className="text-stone-600 font-medium text-right">Variants</TableHead>
             </TableRow>
           </TableHeader>
@@ -317,13 +322,13 @@ function InventoryVariantRow({
         {formatCurrencyAmount(variant.mrp)}
       </TableCell>
       <TableCell className="text-right text-stone-600 text-sm tabular-nums">
-        {formatCurrencyAmount(variant.cost_price)}
+        {formatGstInclusive(variant.cost_price)}
       </TableCell>
       <TableCell className="text-right text-stone-600 text-sm tabular-nums">
-        {formatCurrencyAmount(variant.selling_price)}
+        {formatGstInclusive(variant.selling_price)}
       </TableCell>
       <TableCell className="text-right text-stone-600 text-sm tabular-nums">
-        {formatMarginPercent(variant.cost_price, variant.selling_price)}
+        {formatProfit(variant.cost_price, variant.selling_price)}
       </TableCell>
       <TableCell className="text-right">
         <Link

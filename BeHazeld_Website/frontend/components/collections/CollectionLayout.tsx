@@ -80,9 +80,9 @@ export function CollectionLayout({ eyebrow, title, description, products }: Coll
           {productSlots.map((product) => (
             <article
               key={product.name}
-              className="group grid h-[500px] grid-cols-4 border border-[rgba(192,147,48,0.28)] bg-[rgba(18,10,5,0.58)] transition duration-500 hover:border-[rgba(192,147,48,0.68)] hover:bg-[rgba(26,14,8,0.82)]"
+              className="collection-editorial-card group border border-[rgba(192,147,48,0.28)] bg-[rgba(18,10,5,0.58)] transition duration-500 hover:border-[rgba(192,147,48,0.68)] hover:bg-[rgba(26,14,8,0.82)]"
             >
-              <div className="relative min-w-0 overflow-hidden border-r border-[rgba(192,147,48,0.22)] bg-[#1A0E08]">
+              <div className="collection-editorial-card__image relative min-w-0 overflow-hidden bg-[#1A0E08]">
                 <img
                   src={product.image}
                   alt={product.name}
@@ -93,19 +93,19 @@ export function CollectionLayout({ eyebrow, title, description, products }: Coll
                 <div className="absolute inset-3 border border-[rgba(192,147,48,0.16)] transition duration-500 group-hover:border-[rgba(192,147,48,0.5)]" />
               </div>
 
-              <div className="flex min-w-0 items-center justify-center border-r border-[rgba(192,147,48,0.22)] px-4 py-5 text-center">
+              <div className="collection-editorial-card__name flex min-w-0 items-center justify-center px-4 py-5 text-center">
                 <h2 className="font-serif text-xl font-light italic leading-tight text-[#F8F0E8]">
                   {product.name}
                 </h2>
               </div>
 
-              <div className="flex min-w-0 items-center justify-center border-r border-[rgba(192,147,48,0.22)] px-4 py-5 text-center">
+              <div className="collection-editorial-card__note flex min-w-0 items-center justify-center px-4 py-5 text-center">
                 <p className="font-sans text-[9px] font-light uppercase leading-5 text-[rgba(177,152,112,0.78)]" style={{ letterSpacing: "0.18em" }}>
                   {product.note}
                 </p>
               </div>
 
-              <div className="flex min-w-0 flex-col items-center justify-center px-4 py-5 text-center">
+              <div className="collection-editorial-card__price flex min-w-0 flex-col items-center justify-center px-4 py-5 text-center">
                 <p className="font-sans text-[9px] font-light uppercase text-[#C09330]" style={{ letterSpacing: "0.28em" }}>
                   Quick View
                 </p>

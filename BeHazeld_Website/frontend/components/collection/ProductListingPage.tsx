@@ -34,6 +34,7 @@ function splitTaglines(desc: string): [string, string] {
 
 export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: Props) {
   const hasProducts = collection.products.length > 0;
+  const isCampusMuse = collection.slug === "campus-muse";
   const [tagline1, tagline2] = taglines ?? splitTaglines(collection.description || collection.name);
 
   return (
@@ -46,16 +47,15 @@ export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: 
           grid alignItems="stretch" keeps both columns identical height
           ══════════════════════════════════════════════════════════════ */}
       <div
+        className="collection-hero-grid"
         style={{
-          display: "grid",
-          gridTemplateColumns: "clamp(160px, 20vw, 260px) 1fr",
           alignItems: "stretch",
           background: HERO_BG,
           borderBottom: `1px solid ${GOLD_DIM}`,
         }}
       >
         {/* LEFT — photo fills the full height of the grid row */}
-        <div className="relative overflow-hidden" style={{ background: HERO_BG }}>
+        <div className="collection-hero-media relative overflow-hidden" style={{ background: HERO_BG }}>
           {collection.hero_image_url ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img
@@ -84,7 +84,7 @@ export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: 
         {/* RIGHT — single bordered box, vertically centred */}
         <div
           style={{
-            padding: "clamp(20px, 3.5vw, 48px) clamp(24px, 4.5vw, 64px)",
+            padding: "clamp(16px, 3.5vw, 48px) clamp(16px, 4.5vw, 64px)",
             background: `${HERO_BG}f8`,
             borderLeft: `1px solid ${GOLD_FADE}`,
             display: "flex",
@@ -94,14 +94,22 @@ export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: 
           <div
             style={{
               border: `1px solid ${GOLD_DIM}`,
-              padding: "clamp(16px, 2.4vw, 32px) clamp(20px, 3.2vw, 44px)",
+              padding: isCampusMuse
+                ? "clamp(20px, 2.6vw, 36px) clamp(20px, 3vw, 42px)"
+                : "clamp(16px, 2.4vw, 32px) clamp(20px, 3.2vw, 44px)",
               width: "100%",
+              maxWidth: isCampusMuse ? 820 : undefined,
+              minHeight: isCampusMuse ? "clamp(180px, 14vw, 240px)" : undefined,
+              margin: isCampusMuse ? "0 auto" : undefined,
+              display: isCampusMuse ? "flex" : undefined,
+              flexDirection: isCampusMuse ? "column" : undefined,
+              justifyContent: isCampusMuse ? "center" : undefined,
             }}
           >
             <h1
               className="font-display font-light italic leading-none"
               style={{
-                fontSize: "clamp(30px, 5vw, 68px)",
+                fontSize: isCampusMuse ? "clamp(44px, 5.4vw, 82px)" : "clamp(30px, 5vw, 68px)",
                 color: "rgba(248,240,232,0.97)",
                 letterSpacing: "-0.01em",
                 marginBottom: "clamp(12px, 1.6vw, 22px)",
@@ -113,7 +121,7 @@ export function ProductListingPage({ collection, eyebrow: _eyebrow, taglines }: 
             <p
               className="font-serif font-light"
               style={{
-                fontSize: "clamp(12px, 1.3vw, 17px)",
+                fontSize: isCampusMuse ? "clamp(15px, 1.55vw, 22px)" : "clamp(12px, 1.3vw, 17px)",
                 color: "rgba(248,240,232,0.68)",
                 lineHeight: 1.6,
                 letterSpacing: "0.01em",

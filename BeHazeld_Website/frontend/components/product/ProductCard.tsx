@@ -40,7 +40,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   const productHref = `/products/${encodeURIComponent(product.slug)}`;
 
   return (
-    <article style={{ display: "flex", flexDirection: "column", width: 350 }}>
+    <article className="product-card" style={{ display: "flex", flexDirection: "column", width: "100%" }}>
 
       {/* ── Single portrait image ──────────────────────────────── */}
       <a
@@ -51,8 +51,8 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
         <div
           className="relative overflow-hidden"
           style={{
-            width: 350,
-            height: 450,
+            width: "100%",
+            aspectRatio: "7 / 9",
             background: "linear-gradient(145deg, #D8CEBC 0%, #C8BCA8 100%)",
             border: "1px solid rgba(140,100,30,0.2)",
             borderBottom: "none",

@@ -43,22 +43,19 @@ export function ProductGrid({ products, error }: ProductGridProps) {
   }
 
   return (
-    /* Fixed 4-column grid — each product image box is 350 × 450 px. */
     <div
+      className="product-listing-grid"
       style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 350px)",
         gap: 0,
         border: "1px solid rgba(140,100,30,0.2)",
-        overflowX: "auto",
-        width: 1400,
-        maxWidth: "none",
+        width: "100%",
       }}
     >
       {products.map((product, index) => (
         <div
           key={product.id}
-          style={{ width: 350, borderRight: "1px solid rgba(140,100,30,0.2)" }}
+          className="min-w-0"
+          style={{ borderRight: "1px solid rgba(140,100,30,0.2)" }}
         >
           {/* index passed so placeholder shows "Pic 1", "Pic 2" … */}
           <ProductCard product={product} index={index} />

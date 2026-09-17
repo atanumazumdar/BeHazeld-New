@@ -13,7 +13,7 @@ import uuid
 from datetime import date
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 from typing import Optional
 
@@ -81,6 +81,16 @@ class SalesRepository:
         return list(self.db.scalars(q.order_by(Customer.name)))
 
     # ── SaleBill ──────────────────────────────────────────────────────────────
+
+    def lock_invoice_sequence(self, tenant_id: uuid.UUID) -> None:
+        """Serialize invoice allocation per tenant until the transaction ends."""
+        bind = self.db.get_bind()
+        dialect_name = getattr(getattr(bind, "dialect", None), "name", None)
+        if dialect_name == "postgresql":
+            self.db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:lock_key))"),
+                {"lock_key": f"sales-invoice:{tenant_id}"},
+            )
 
     def count_bills_by_tenant(self, tenant_id: uuid.UUID) -> int:
         result = self.db.scalar(

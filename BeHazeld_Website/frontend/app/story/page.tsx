@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { motion, type Variants } from "framer-motion";
 
@@ -36,6 +38,27 @@ const SERIF_ITALIC: React.CSSProperties = {
   fontStyle: "italic", fontWeight: 300,
   color: "rgba(248,240,232,0.88)", lineHeight: 1.6,
 };
+
+const FEATURED_COLLECTIONS = [
+  {
+    title: "Campus Muse",
+    subtitle: "Ease, reimagined for every day",
+    image: "/campus-muse-new.png",
+    href: "/collections/campus-muse",
+  },
+  {
+    title: "Power Edit",
+    subtitle: "Quiet authority, impeccably cut",
+    image: "/power-edit.png",
+    href: "/collections/power-edit",
+  },
+  {
+    title: "Afterglow Evenings",
+    subtitle: "Made for moments after dusk",
+    image: "/afterglow-evenings-new.png",
+    href: "/collections/afterglow-evenings",
+  },
+] as const;
 
 /* ── Gold ornament ───────────────────────────────────────── */
 function GoldRule({ delay }: { delay: number }) {
@@ -108,6 +131,7 @@ export default function OurStoryPage() {
   };
 
   return (
+    <>
     <motion.main
       variants={PAGE} initial="initial" animate="animate"
       className="story-layout relative z-10"
@@ -237,6 +261,19 @@ export default function OurStoryPage() {
             <span style={{ color: "#C09330", fontWeight: 400 }}>BeHAZEL&apos;d</span>{" "}is not just a label. It is a story — Hazel&apos;s story.
           </motion.p>
 
+          <motion.div {...up(1.26)} className="mb-5 mt-5">
+            <Link
+              href="/atelier"
+              className="group inline-flex min-h-12 items-center justify-center border border-[#C09330] bg-[#C09330] px-8 font-sans text-[9px] font-normal uppercase text-[#120A05] shadow-[0_16px_38px_rgba(192,147,48,0.16)] transition duration-500 hover:bg-transparent hover:text-[#F8F0E8] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#C09330]"
+              style={{ letterSpacing: "0.34em" }}
+            >
+              Explore the Atelier
+              <span aria-hidden="true" className="ml-4 transition-transform duration-500 group-hover:translate-x-1">
+                →
+              </span>
+            </Link>
+          </motion.div>
+
           {/* Body §1 */}
           <motion.p {...up(1.3)} className="font-sans font-light mb-3" style={BODY}>
             Born in Mumbai and shaped by boardrooms across continents, Hazel built a career with a Fortune 500
@@ -295,5 +332,72 @@ export default function OurStoryPage() {
         </div>
       </div>
     </motion.main>
+
+    <section
+      aria-labelledby="featured-collections-title"
+      className="relative z-10 overflow-hidden border-y border-[rgba(192,147,48,0.16)] bg-[#F8F4EC] px-5 py-20 text-[#1A0E08] sm:px-8 sm:py-24 lg:px-12 lg:py-32"
+    >
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{ background: "radial-gradient(circle at 50% 0%, rgba(192,147,48,0.10), transparent 34rem)" }}
+      />
+
+      <div className="relative mx-auto max-w-[1380px]">
+        <div className="mx-auto mb-14 max-w-2xl text-center sm:mb-16 lg:mb-20">
+          <p className="font-sans text-[8px] font-normal uppercase text-[#8B6914]" style={{ letterSpacing: "0.52em" }}>
+            The signature edit
+          </p>
+          <h2
+            id="featured-collections-title"
+            className="font-display mt-4 text-4xl font-light italic sm:text-5xl lg:text-6xl"
+          >
+            Featured Collections
+          </h2>
+          <p className="mx-auto mt-5 max-w-xl font-sans text-sm font-light leading-7 text-[rgba(26,14,8,0.64)]">
+            Three expressions of modern femininity, designed to move with every chapter of your day.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 md:gap-5 lg:gap-8">
+          {FEATURED_COLLECTIONS.map((collection, index) => (
+            <Link
+              key={collection.title}
+              href={collection.href}
+              className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#8B6914]"
+            >
+              <article className="relative">
+                <div className="relative aspect-[4/5] overflow-hidden bg-[#E9E0D2]">
+                  <Image
+                    src={collection.image}
+                    alt={`${collection.title} collection preview`}
+                    fill
+                    sizes="(min-width: 768px) 33vw, 100vw"
+                    priority={index === 0}
+                    className="object-cover transition duration-700 ease-out group-hover:scale-[1.035]"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[rgba(18,10,5,0.34)] via-transparent to-transparent opacity-60 transition duration-500 group-hover:opacity-35" />
+                  <div className="absolute inset-3 border border-[rgba(248,244,236,0.42)] transition duration-500 group-hover:inset-4 group-hover:border-[rgba(248,244,236,0.72)]" />
+                </div>
+
+                <div className="px-1 pb-2 pt-6 text-center">
+                  <h3 className="font-display text-2xl font-light italic sm:text-[1.7rem]">
+                    {collection.title}
+                  </h3>
+                  <p className="mt-2 font-sans text-[9px] font-light uppercase text-[rgba(26,14,8,0.56)]" style={{ letterSpacing: "0.24em" }}>
+                    {collection.subtitle}
+                  </p>
+                  <span className="mt-5 inline-flex items-center border-b border-[rgba(139,105,20,0.48)] pb-1 font-sans text-[8px] font-normal uppercase text-[#6F5112]" style={{ letterSpacing: "0.28em" }}>
+                    Discover collection
+                    <span aria-hidden="true" className="ml-3 transition-transform duration-500 group-hover:translate-x-1">→</span>
+                  </span>
+                </div>
+              </article>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+    </>
   );
 }

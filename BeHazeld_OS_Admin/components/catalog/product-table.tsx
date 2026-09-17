@@ -43,6 +43,7 @@ import {
 } from '@/hooks/use-catalog';
 import { ApiError } from '@/types/api';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
+import { addGst } from '@/lib/pricing';
 import { AddVariantDialog } from './add-variant-dialog';
 import { EditProductDialog } from './edit-product-dialog';
 import { EditVariantDialog } from './edit-variant-dialog';
@@ -200,8 +201,8 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
               <TableHead className="w-32 text-stone-600 font-medium">Color</TableHead>
               <TableHead className="w-24 text-stone-600 font-medium">Size</TableHead>
               <TableHead className="w-24 text-stone-600 font-medium text-right">MRP</TableHead>
-              <TableHead className="w-24 text-stone-600 font-medium text-right">Cost</TableHead>
-              <TableHead className="w-24 text-stone-600 font-medium text-right">Selling</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium text-right">Cost + GST</TableHead>
+              <TableHead className="w-24 text-stone-600 font-medium text-right">Final Selling</TableHead>
               <TableHead className="text-stone-600 font-medium">Picture</TableHead>
               <TableHead className="text-stone-600 font-medium">Status</TableHead>
               <TableHead className="min-w-[440px] text-stone-600 font-medium text-right">Actions</TableHead>
@@ -241,10 +242,10 @@ export function ProductTable({ onCreateClick }: ProductTableProps) {
                     {formatWholeAmount(variant?.mrp)}
                   </TableCell>
                   <TableCell className="text-right text-stone-600 text-sm tabular-nums">
-                    {formatWholeAmount(variant?.cost_price)}
+                    {variant?.cost_price ? formatWholeAmount(String(addGst(Number(variant.cost_price)))) : '—'}
                   </TableCell>
                   <TableCell className="text-right text-stone-600 text-sm tabular-nums">
-                    {formatWholeAmount(variant?.selling_price)}
+                    {variant?.selling_price ? formatWholeAmount(String(addGst(Number(variant.selling_price)))) : '—'}
                   </TableCell>
                   <TableCell>
                     <Badge

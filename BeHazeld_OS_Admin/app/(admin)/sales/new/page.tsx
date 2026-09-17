@@ -36,6 +36,7 @@ import { ApiError } from '@/types/api';
 import type { CustomerResponse } from '@/types/sales';
 import type { CartLine, SalePaymentMode } from '@/types/sales';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
+import { addGst } from '@/lib/pricing';
 
 const PAYMENT_MODES: { value: SalePaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -81,7 +82,7 @@ export default function SalesPOSPage() {
           productName: product.name,
           quantity: 1,
           sellingPrice: price,
-          taxRate: 0,
+          taxRate: 0.05,
           discountAmount: 0,
         },
       ];
@@ -320,7 +321,7 @@ export default function SalesPOSPage() {
                   <tr className="bg-stone-50 text-stone-500 text-xs uppercase tracking-wide">
                     <th className="text-left px-4 py-2.5 font-medium">Item</th>
                     <th className="text-center px-3 py-2.5 font-medium w-24">Qty</th>
-                    <th className="text-right px-3 py-2.5 font-medium w-24">Unit Price</th>
+                    <th className="text-right px-3 py-2.5 font-medium w-24">Price + 5% GST</th>
                     <th className="text-right px-3 py-2.5 font-medium w-24">Disc.</th>
                     <th className="text-right px-4 py-2.5 font-medium w-28">Line Total</th>
                     <th className="w-8" />
@@ -329,6 +330,7 @@ export default function SalesPOSPage() {
                 <tbody className="divide-y divide-stone-100">
                   {cart.map((line) => {
                     const net = (line.sellingPrice - line.discountAmount) * line.quantity;
+                    const finalLineTotal = net * (1 + line.taxRate);
                     return (
                       <tr key={line.variantId} className="hover:bg-stone-50/40">
                         <td className="px-4 py-3">
@@ -359,7 +361,7 @@ export default function SalesPOSPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3 text-right text-slate-700 font-mono">
-                          ₹{line.sellingPrice.toFixed(2)}
+                          ₹{addGst(line.sellingPrice).toFixed(2)}
                         </td>
                         <td className="px-3 py-3 text-right">
                           <input
@@ -372,7 +374,7 @@ export default function SalesPOSPage() {
                           />
                         </td>
                         <td className="px-4 py-3 text-right font-mono font-semibold text-slate-800">
-                          ₹{net.toFixed(2)}
+                          ₹{finalLineTotal.toFixed(2)}
                         </td>
                         <td className="pr-3">
                           <button
@@ -411,6 +413,7 @@ export default function SalesPOSPage() {
                 <ul className="space-y-1.5 text-sm">
                   {cart.map((line) => {
                     const net = (line.sellingPrice - line.discountAmount) * line.quantity;
+                    const finalLineTotal = net * (1 + line.taxRate);
                     return (
                       <li key={line.variantId} className="flex justify-between gap-2">
                         <span className="text-stone-600 truncate flex-1">
@@ -419,7 +422,7 @@ export default function SalesPOSPage() {
                             {line.skuCode} · ×{line.quantity}
                           </span>
                         </span>
-                        <span className="font-mono text-slate-700 shrink-0">₹{net.toFixed(2)}</span>
+                        <span className="font-mono text-slate-700 shrink-0">₹{finalLineTotal.toFixed(2)}</span>
                       </li>
                     );
                   })}

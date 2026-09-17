@@ -37,6 +37,7 @@ class CreateSaleBillLineRequest(BaseModel):
     product_variant_id: uuid.UUID
     quantity: Annotated[Decimal, Field(gt=0)]
     selling_price: Annotated[Decimal, Field(gt=0)]
+    # The service enforces 0% before 2026-09-01 and 5% from that date onward.
     tax_rate: Annotated[Decimal, Field(ge=0, le=1)] = Decimal("0")
     discount_amount: Annotated[Decimal, Field(ge=0)] = Decimal("0")
 

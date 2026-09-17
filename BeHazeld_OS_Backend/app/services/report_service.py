@@ -1,277 +1,127 @@
-"""
-ReportService — PDF invoice generation using ReportLab.
-
-Public API
-----------
-generate_invoice_pdf(bill, tenant_name) → bytes
-    Pure function: builds a professional invoice PDF in memory and returns
-    the raw bytes. No file I/O — the caller decides where to persist it.
-
-save_invoice_pdf(pdf_bytes, tenant_id, invoice_number) → InvoiceMetadata
-    Saves bytes to INVOICE_STORAGE_PATH/{tenant_id}/{invoice_number}.pdf
-    and returns InvoiceMetadata (path + file size).
-
-Invoice layout
---------------
-┌──────────────────────────────────────────────┐
-│  [INVOICE]                    Business Name  │
-│  Invoice: INV-000001          Date: 25-05-26 │
-│  Customer: Walk-in                           │
-├──────────────────────────────────────────────┤
-│  # │ SKU   │ Description │ Qty │ Price │ Amt │
-│  ─────────────────────────────────────────── │
-│  1 │ ...   │ ...         │ 10  │ 200   │2000 │
-├──────────────────────────────────────────────┤
-│               Subtotal: ₹XXXX               │
-│               Tax:      ₹XXXX               │
-│               Discount: ₹XXXX               │
-│               TOTAL:    ₹XXXX               │
-├──────────────────────────────────────────────┤
-│  Payment: Cash          Ref: TXN-001        │
-└──────────────────────────────────────────────┘
-"""
+"""Generate branded BeHazel'd sale invoices from the approved PDF template."""
 from __future__ import annotations
 
 import io
-import os
 import uuid
 from decimal import Decimal
 from pathlib import Path
+from textwrap import shorten
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.units import mm
-from reportlab.platypus import (
-    HRFlowable,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
-from reportlab.lib.enums import TA_RIGHT, TA_CENTER, TA_LEFT
+from pypdf import PdfReader, PdfWriter
+from reportlab.pdfgen import canvas
 
 from app.core.config import settings
 from app.schemas.sales import InvoiceMetadata
 
-# ── Brand colours ─────────────────────────────────────────────────────────────
-_PRIMARY   = colors.HexColor("#1A1A2E")   # deep navy
-_ACCENT    = colors.HexColor("#E94560")   # coral-red
-_LIGHT_BG  = colors.HexColor("#F5F5F5")
-_WHITE     = colors.white
-_GREY      = colors.HexColor("#666666")
 
-# ── Page geometry ──────────────────────────────────────────────────────────────
-_PAGE_W, _PAGE_H = A4
-_MARGIN = 18 * mm
+_TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "assets" / "invoice-template.pdf"
+TEMPLATE_VERSION = "behazeld-gst-canva-v3-aligned"
+_PAGE_WIDTH, _PAGE_HEIGHT = 810.0, 1012.5
+_ITEMS_PER_PAGE = 15
 
 
-def generate_invoice_pdf(bill, tenant_name: str = "BeHazeld") -> bytes:
-    """
-    Build an invoice PDF from a SaleBill ORM object (or any object with the
-    same attribute shape). Returns raw PDF bytes — no file I/O.
+def _money(value: object) -> str:
+    return f"Rs. {Decimal(str(value or 0)):,.2f}"
 
-    Parameters
-    ----------
-    bill        : SaleBill ORM instance (or a MagicMock with matching attrs)
-    tenant_name : Displayed as the business name in the header.
-    """
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=_MARGIN,
-        rightMargin=_MARGIN,
-        topMargin=_MARGIN,
-        bottomMargin=_MARGIN,
-    )
 
-    styles = getSampleStyleSheet()
-    normal = styles["Normal"]
+def _quantity(value: object) -> str:
+    quantity = Decimal(str(value or 0))
+    return format(quantity.normalize(), "f")
 
-    h1 = ParagraphStyle("H1", fontSize=24, textColor=_PRIMARY,
-                        spaceAfter=2, fontName="Helvetica-Bold", alignment=TA_CENTER)
-    h2 = ParagraphStyle("H2", fontSize=10, textColor=_GREY,
-                        fontName="Helvetica", alignment=TA_CENTER)
-    label = ParagraphStyle("Label", fontSize=8, textColor=_GREY,
-                           fontName="Helvetica")
-    value = ParagraphStyle("Value", fontSize=10, textColor=_PRIMARY,
-                           fontName="Helvetica-Bold")
-    right_label = ParagraphStyle("RightLabel", fontSize=9, textColor=_GREY,
-                                 fontName="Helvetica", alignment=TA_RIGHT)
-    right_value = ParagraphStyle("RightValue", fontSize=11, textColor=_PRIMARY,
-                                 fontName="Helvetica-Bold", alignment=TA_RIGHT)
-    total_style = ParagraphStyle("TotalStyle", fontSize=13, textColor=_ACCENT,
-                                 fontName="Helvetica-Bold", alignment=TA_RIGHT)
 
-    story: list = []
+def _line_description(line: object) -> str:
+    variant = getattr(line, "variant", None)
+    product = getattr(variant, "product", None)
+    product_name = getattr(product, "name", None) or "Product"
+    sku = getattr(variant, "sku_code", None)
+    description = f"{product_name} - {sku}" if sku else product_name
+    return shorten(str(description), width=46, placeholder="...")
 
-    # ── Header ─────────────────────────────────────────────────────────────────
-    story.append(Paragraph("BeHazel'd", h1))
-    story.append(Paragraph("be you, with HAZEL", h2))
-    story.append(Spacer(1, 3 * mm))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=_ACCENT, spaceAfter=8))
 
-    # ── Invoice meta ───────────────────────────────────────────────────────────
-    invoice_no = getattr(bill, "invoice_number", "—")
-    bill_date  = getattr(bill, "bill_date", "—")
-    customer   = getattr(bill, "customer", None)
-    cust_name  = customer.name if customer else "Walk-in Customer"
-    cust_phone = getattr(customer, "phone", None) if customer else None
+def _overlay_page(
+    bill: object,
+    lines: list[object],
+    page_number: int,
+    page_count: int,
+    show_totals: bool,
+) -> bytes:
+    stream = io.BytesIO()
+    pdf = canvas.Canvas(stream, pagesize=(_PAGE_WIDTH, _PAGE_HEIGHT))
+    pdf.setFillColorRGB(0.08, 0.08, 0.08)
 
-    meta_data = [
-        [
-            Paragraph("<b>Name</b>", label),
-            Paragraph(cust_name, value),
-            "",
-            Paragraph("<b>Phone Number</b>", label),
-            Paragraph(str(cust_phone or "—"), value),
-        ],
-        [
-            Paragraph("<b>Inv No</b>", label),
-            Paragraph(str(invoice_no), value),
-            "",
-            Paragraph("<b>Date</b>", label),
-            Paragraph(str(bill_date), value),
-        ],
-    ]
-    usable_w = _PAGE_W - 2 * _MARGIN
-    meta_tbl = Table(meta_data, colWidths=[
-        usable_w * 0.15, usable_w * 0.30, usable_w * 0.05,
-        usable_w * 0.15, usable_w * 0.35,
-    ])
-    meta_tbl.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-    ]))
-    story.append(Spacer(1, 4 * mm))
-    story.append(meta_tbl)
-    story.append(Spacer(1, 4 * mm))
+    customer = getattr(bill, "customer", None)
+    customer_name = getattr(customer, "name", None) or "Walk-in Customer"
+    customer_phone = getattr(customer, "phone", None) or "-"
+    bill_date = getattr(bill, "bill_date", "-")
+    invoice_number = getattr(bill, "invoice_number", "-")
 
-    # ── Line items table ───────────────────────────────────────────────────────
-    col_headers = ["Item Description", "Quantity", "Price", "Total"]
-    tbl_data = [col_headers]
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(194, 836, shorten(str(customer_name), width=32, placeholder="..."))
+    pdf.drawString(194, 792, shorten(str(customer_phone), width=28, placeholder="..."))
+    pdf.drawString(630, 836, shorten(str(invoice_number), width=18, placeholder="..."))
+    pdf.drawString(630, 792, str(bill_date))
 
-    lines = getattr(bill, "lines", []) or []
-    for line in lines:
-        variant = getattr(line, "variant", None)
-        sku = getattr(variant, "sku_code", None) or str(getattr(line, "product_variant_id", ""))[:8]
-        product = getattr(variant, "product", None)
-        product_name = getattr(product, "name", None) or "Product"
-        qty        = getattr(line, "quantity", 0)
-        price      = getattr(line, "selling_price", 0)
-        total      = getattr(line, "total_line_amount", 0)
-        tbl_data.append([
-            Paragraph(f"{product_name}<br/><font size='7'>{sku}</font>", normal),
-            f"{qty:g}",
-            f"₹{price:,.2f}",
-            f"₹{total:,.2f}",
-        ])
+    pdf.setFont("Helvetica", 10)
+    start_index = page_number * _ITEMS_PER_PAGE
+    row_y = 714
+    for row_index, line in enumerate(lines):
+        serial = start_index + row_index + 1
+        quantity = getattr(line, "quantity", 0)
+        price = getattr(line, "selling_price", 0)
+        total = getattr(line, "total_line_amount", 0)
 
-    col_ws = [
-        usable_w * 0.52,
-        usable_w * 0.14,
-        usable_w * 0.17,
-        usable_w * 0.17,
-    ]
-    items_tbl = Table(tbl_data, colWidths=col_ws, repeatRows=1)
-    items_tbl.setStyle(TableStyle([
-        # Header row
-        ("BACKGROUND",  (0, 0), (-1, 0), _PRIMARY),
-        ("TEXTCOLOR",   (0, 0), (-1, 0), _WHITE),
-        ("FONTNAME",    (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE",    (0, 0), (-1, 0), 8),
-        ("ALIGN",       (0, 0), (-1, 0), "CENTER"),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 6),
-        ("TOPPADDING",    (0, 0), (-1, 0), 6),
-        # Data rows
-        ("FONTNAME",   (0, 1), (-1, -1), "Helvetica"),
-        ("FONTSIZE",   (0, 1), (-1, -1), 8),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [_WHITE, _LIGHT_BG]),
-        ("ALIGN",      (1, 1), (-1, -1), "RIGHT"),
-        ("TOPPADDING",    (0, 1), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
-        # Grid
-        ("LINEBELOW",  (0, 0), (-1, 0), 1, _PRIMARY),
-        ("LINEBELOW",  (0, -1), (-1, -1), 0.5, _GREY),
-    ]))
-    story.append(items_tbl)
-    story.append(Spacer(1, 4 * mm))
+        pdf.drawCentredString(47, row_y, str(serial))
+        pdf.drawString(150, row_y, _line_description(line))
+        pdf.drawRightString(438, row_y, _quantity(quantity))
+        pdf.drawRightString(582, row_y, _money(price))
+        pdf.drawRightString(697, row_y, _money(total))
+        row_y -= 28
 
-    # ── Totals ─────────────────────────────────────────────────────────────────
-    gross       = getattr(bill, "total_amount", Decimal("0"))
-    tax_amt     = getattr(bill, "tax_amount", Decimal("0"))
-    disc_total  = getattr(bill, "total_discount", Decimal("0"))
-    subtotal    = Decimal(str(gross)) + Decimal(str(disc_total)) - Decimal(str(tax_amt))
+    if page_count > 1:
+        pdf.setFont("Helvetica", 8)
+        pdf.drawCentredString(_PAGE_WIDTH / 2, 304, f"Page {page_number + 1} of {page_count}")
 
-    def _row(lbl: str, val: str, bold: bool = False) -> list:
-        s = total_style if bold else right_label
-        return [
-            "",
-            Paragraph(lbl, right_label),
-            Paragraph(val, total_style if bold else right_value),
-        ]
+    if show_totals:
+        gross = Decimal(str(getattr(bill, "total_amount", 0) or 0))
+        discount = Decimal(str(getattr(bill, "total_discount", 0) or 0))
+        tax = Decimal(str(getattr(bill, "tax_amount", 0) or 0))
+        subtotal = gross + discount - tax
 
-    totals_data = [
-        _row("Subtotal:", f"₹{subtotal:,.2f}"),
-        _row("Tax:", f"₹{Decimal(str(tax_amt)):,.2f}"),
-        _row("Discount:", f"-₹{Decimal(str(disc_total)):,.2f}"),
-        _row("TOTAL DUE:", f"₹{Decimal(str(gross)):,.2f}", bold=True),
-    ]
-    totals_tbl = Table(totals_data, colWidths=[usable_w * 0.55, usable_w * 0.25, usable_w * 0.20])
-    totals_tbl.setStyle(TableStyle([
-        ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 3),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
-        ("LINEABOVE", (1, -1), (-1, -1), 1.5, _ACCENT),
-    ]))
-    story.append(totals_tbl)
-    story.append(Spacer(1, 4 * mm))
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawRightString(766, 184, _money(subtotal))
+        pdf.drawRightString(766, 144, _money(discount))
+        pdf.drawRightString(766, 104, _money(gross))
 
-    # ── Payment info ───────────────────────────────────────────────────────────
-    payments = getattr(bill, "payments", []) or []
-    if payments:
-        pay_rows = [["Payment Mode", "Amount", "Reference"]]
-        for p in payments:
-            pay_rows.append([
-                str(getattr(p, "payment_mode", "")).replace("_", " ").title(),
-                f"₹{getattr(p, 'amount', 0):,.2f}",
-                str(getattr(p, "transaction_id", "") or "—"),
-            ])
-        pay_tbl = Table(pay_rows, colWidths=[usable_w * 0.35, usable_w * 0.25, usable_w * 0.40])
-        pay_tbl.setStyle(TableStyle([
-            ("BACKGROUND",  (0, 0), (-1, 0), _LIGHT_BG),
-            ("FONTNAME",    (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE",    (0, 0), (-1, -1), 8),
-            ("ALIGN",       (1, 0), (1, -1), "RIGHT"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LINEBELOW",   (0, 0), (-1, 0), 0.5, _GREY),
-        ]))
-        story.append(pay_tbl)
+    pdf.save()
+    return stream.getvalue()
 
-    story.append(Spacer(1, 6 * mm))
-    story.append(HRFlowable(width="100%", thickness=0.5, color=_GREY))
-    story.append(Spacer(1, 2 * mm))
-    story.append(Paragraph("Thank You !!", ParagraphStyle(
-        "Thanks", fontSize=15, textColor=_ACCENT,
-        alignment=TA_CENTER, fontName="Helvetica-Bold",
-    )))
-    story.append(Spacer(1, 2 * mm))
-    story.append(Paragraph(
-        "You didn’t just shop — you made a statement.<br/>"
-        "Welcome to the world of refined simplicity. Stay stylish. Stay BeHAZEL’d.<br/>"
-        "With Love – Hazel<br/>"
-        "Visit our Website – www.behazeld.com<br/>"
-        "Stay connected - @behazeld",
-        ParagraphStyle("Footer", fontSize=7, textColor=_GREY,
-                       alignment=TA_CENTER, fontName="Helvetica-Oblique"),
-    ))
 
-    doc.build(story)
-    return buf.getvalue()
+def generate_invoice_pdf(bill: object, tenant_name: str = "BeHazeld") -> bytes:
+    """Overlay live sale data onto the approved BeHazel'd invoice template."""
+    if not _TEMPLATE_PATH.exists():
+        raise FileNotFoundError(f"Invoice template not found: {_TEMPLATE_PATH}")
+
+    lines = list(getattr(bill, "lines", []) or [])
+    page_count = max(1, (len(lines) + _ITEMS_PER_PAGE - 1) // _ITEMS_PER_PAGE)
+    template_page = PdfReader(str(_TEMPLATE_PATH)).pages[0]
+    writer = PdfWriter()
+
+    for page_number in range(page_count):
+        first = page_number * _ITEMS_PER_PAGE
+        page_lines = lines[first:first + _ITEMS_PER_PAGE]
+        page = PdfReader(io.BytesIO(_overlay_page(
+            bill,
+            page_lines,
+            page_number,
+            page_count,
+            show_totals=page_number == page_count - 1,
+        ))).pages[0]
+        page.merge_page(template_page, over=False)
+        writer.add_page(page)
+
+    output = io.BytesIO()
+    writer.write(output)
+    return output.getvalue()
 
 
 def save_invoice_pdf(
@@ -279,17 +129,14 @@ def save_invoice_pdf(
     tenant_id: uuid.UUID,
     invoice_number: str,
 ) -> InvoiceMetadata:
-    """
-    Persist PDF bytes to local storage and return metadata.
-
-    Path: {INVOICE_STORAGE_PATH}/{tenant_id}/{invoice_number}.pdf
-    """
     base_dir = Path(settings.INVOICE_STORAGE_PATH) / str(tenant_id)
     base_dir.mkdir(parents=True, exist_ok=True)
-
     file_path = base_dir / f"{invoice_number}.pdf"
     file_path.write_bytes(pdf_bytes)
-
+    file_path.with_suffix(".pdf.template-version").write_text(
+        TEMPLATE_VERSION,
+        encoding="ascii",
+    )
     return InvoiceMetadata(
         invoice_number=invoice_number,
         file_path=str(file_path),

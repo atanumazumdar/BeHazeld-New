@@ -41,7 +41,7 @@ function AtelierCard({ coll }: { coll: (typeof COLLECTIONS)[number] }) {
   return (
     <Link href={coll.href} className="block h-full" aria-label={`Explore ${coll.title}`}>
       <article
-        className="group relative flex h-full cursor-pointer select-none flex-col overflow-hidden bg-[#1A0E08] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1"
+        className="atelier-collection-card group relative flex h-full cursor-pointer select-none flex-col overflow-hidden bg-[#1A0E08] transition-[border-color,box-shadow,transform] duration-300 hover:-translate-y-1"
         style={{
           borderRadius: 2,
           border: "1px solid rgba(192,147,48,0.22)",
@@ -49,7 +49,7 @@ function AtelierCard({ coll }: { coll: (typeof COLLECTIONS)[number] }) {
           WebkitTapHighlightColor: "transparent",
         }}
       >
-        <div className="relative shrink-0 overflow-hidden bg-[#120A05]" style={{ height: "clamp(220px, 32vh, 300px)" }}>
+        <div className="atelier-card-image relative shrink-0 overflow-hidden bg-[#120A05]">
           <img
             src={coll.image}
             alt={coll.title}
@@ -75,7 +75,7 @@ function AtelierCard({ coll }: { coll: (typeof COLLECTIONS)[number] }) {
           }}
         />
 
-        <div className="flex shrink-0 flex-col items-center p-4 text-center" style={GLASS}>
+        <div className="atelier-card-copy flex shrink-0 flex-col items-center p-4 text-center" style={GLASS}>
           <div className="w-full">
             <h2
               className="font-display font-normal italic"
@@ -133,7 +133,7 @@ export default function TheAtelierPage() {
       className="relative z-10 flex min-h-[calc(100vh-64px)] flex-col overflow-visible lg:min-h-[calc(100vh-80px)]"
       style={{ color: "#F8F0E8" }}
     >
-      <header className="mx-auto max-w-xl shrink-0 px-8 pb-2 pt-3 text-center">
+      <header className="atelier-page-header mx-auto max-w-xl shrink-0 px-8 pb-2 pt-3 text-center">
         <p
           className="mb-2 font-sans font-normal uppercase"
           style={{ fontSize: 8, letterSpacing: "0.42em", color: "#C09330" }}
@@ -164,24 +164,15 @@ export default function TheAtelierPage() {
         </p>
       </header>
 
-      <div style={{ padding: "0 40px 24px", overflowX: "auto" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, minmax(260px, 1fr))",
-            gap: 24,
-            maxWidth: 1152,
-            margin: "0 auto",
-            alignItems: "start",
-          }}
-        >
+      <div className="atelier-page-grid-shell">
+        <div className="atelier-grid atelier-page-grid">
           {COLLECTIONS.map((coll) => (
             <AtelierCard key={coll.id} coll={coll} />
           ))}
         </div>
       </div>
 
-      <footer className="shrink-0 pb-4 text-center md:pb-2">
+      <footer className="atelier-page-footer shrink-0 pb-4 text-center md:pb-2">
         <div className="flex items-center justify-center gap-4 px-8">
           <div
             className="h-px max-w-[180px] flex-1"

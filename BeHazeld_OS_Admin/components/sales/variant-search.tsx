@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge';
 
 import { useProducts, useVariants } from '@/hooks/use-catalog';
 import type { ProductResponse, ProductVariantResponse } from '@/types/catalog';
+import { addGst } from '@/lib/pricing';
 
 interface VariantSearchProps {
   onAdd: (variant: ProductVariantResponse, product: ProductResponse) => void;
@@ -156,7 +157,7 @@ function ProductDropdownItem({
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge className="bg-white text-slate-700 border border-stone-200 text-xs font-normal">
-                        ₹{v.selling_price}
+                        ₹{addGst(Number(v.selling_price)).toFixed(2)} incl. GST
                       </Badge>
                       <span className="text-blue-600 text-xs font-medium">+ Add</span>
                     </div>

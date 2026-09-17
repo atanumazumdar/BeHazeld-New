@@ -23,7 +23,7 @@ export function Header() {
         borderColor:         "rgba(192,147,48,0.16)",
       }}
     >
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:gap-6 sm:px-6 lg:h-20 lg:gap-10 lg:px-8 xl:gap-14">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:h-20 lg:gap-10 lg:px-8 xl:gap-14">
 
         {/* Logo — links home */}
         <Link href="/" className="flex-shrink-0 leading-none" aria-label="BeHazel'd home">
@@ -41,13 +41,13 @@ export function Header() {
         {/* Nav links */}
         <nav
           aria-label="Primary navigation"
-          className="flex min-w-0 flex-1 items-center justify-start overflow-x-auto pb-1 sm:justify-end"
+          className="hidden min-w-0 flex-1 items-center justify-end lg:flex"
           style={{
             scrollbarWidth: "none",
-            fontSize:       10,
+            fontSize:       "clamp(11px, 0.78vw, 14px)",
             fontWeight:     300,
-            columnGap:      "clamp(12px, 2vw, 42px)",
-            letterSpacing:  "clamp(0.1em, 0.42vw, 0.18em)",
+            columnGap:      "clamp(10px, 1.5vw, 34px)",
+            letterSpacing:  "clamp(0.1em, 0.22vw, 0.2em)",
             textTransform:  "uppercase",
             color:          "rgba(248,240,232,0.62)",
           }}
@@ -87,6 +87,21 @@ export function Header() {
             ·
           </Link>
         </nav>
+
+        <div className="flex items-center gap-1 lg:hidden">
+          <CartLink />
+          <details className="mobile-menu relative">
+            <summary className="flex h-11 w-11 cursor-pointer list-none items-center justify-center" aria-label="Open navigation menu">
+              <span className="mobile-menu__icon" aria-hidden="true"><i /><i /><i /></span>
+            </summary>
+            <nav aria-label="Mobile navigation" className="mobile-menu__panel">
+              {NAV_LINKS.map(({ label, href }) => (
+                <Link key={href} href={href}>{label}</Link>
+              ))}
+              <Link href="/checkout">Checkout</Link>
+            </nav>
+          </details>
+        </div>
       </div>
     </header>
   );

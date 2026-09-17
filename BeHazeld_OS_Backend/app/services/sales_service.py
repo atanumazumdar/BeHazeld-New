@@ -54,6 +54,7 @@ import io
 import uuid
 from datetime import date
 from decimal import Decimal
+from app.core.pricing import gst_rate_for, price_with_gst
 from typing import Optional
 
 from sqlalchemy import select, text
@@ -204,15 +205,18 @@ class SalesService:
             cost_amount = Decimal("0")
 
             for line_req, variant in zip(req.lines, variants):
+                effective_tax_rate = gst_rate_for(req.bill_date)
                 net_price   = line_req.selling_price - line_req.discount_amount
                 line_total  = (line_req.quantity * net_price * (
-                    1 + line_req.tax_rate
+                    1 + effective_tax_rate
                 )).quantize(Decimal("0.01"))
-                line_tax    = (line_req.quantity * net_price * line_req.tax_rate
+                line_tax    = (line_req.quantity * net_price * effective_tax_rate
                                ).quantize(Decimal("0.01"))
                 line_disc   = (line_req.quantity * line_req.discount_amount
                                ).quantize(Decimal("0.01"))
-                unit_cost = Decimal(str(variant.cost_price or 0)).quantize(Decimal("0.01"))
+                # Cost is entered before GST in the catalogue. Snapshot the
+                # GST-inclusive landed cost so SKU profit/COGS is not overstated.
+                unit_cost = price_with_gst(Decimal(str(variant.cost_price or 0)), req.bill_date)
                 line_cost = (line_req.quantity * unit_cost).quantize(Decimal("0.01"))
 
                 line_totals.append(line_total)
@@ -228,8 +232,12 @@ class SalesService:
                 if self.repo.get_bill_by_invoice_number(tenant_id, invoice_number) is not None:
                     raise ValidationError(f"Invoice '{invoice_number}' already exists")
             else:
+                self.repo.lock_invoice_sequence(tenant_id)
                 seq = self.repo.count_bills_by_tenant(tenant_id) + 1
                 invoice_number = generate_invoice_number(seq)
+                while self.repo.get_bill_by_invoice_number(tenant_id, invoice_number) is not None:
+                    seq += 1
+                    invoice_number = generate_invoice_number(seq)
 
             # ── Phase 2c: generate PDF bytes (CPU-only) ───────────────────────
             # Build a lightweight bill proxy for the PDF renderer — we don't
@@ -265,6 +273,7 @@ class SalesService:
             )
 
             # ── Phase 3b: lines + stock deduction ────────────────────────────
+            effective_tax_rate = gst_rate_for(req.bill_date)
             for line_req, line_total, unit_cost in zip(req.lines, line_totals, line_unit_costs):
                 self.repo.create_bill_line(
                     tenant_id=tenant_id,
@@ -273,7 +282,7 @@ class SalesService:
                     quantity=line_req.quantity,
                     selling_price=line_req.selling_price,
                     unit_cost=unit_cost,
-                    tax_rate=line_req.tax_rate,
+                    tax_rate=effective_tax_rate,
                     discount_amount=line_req.discount_amount,
                     total_line_amount=line_total,
                 )
@@ -717,8 +726,8 @@ class SalesService:
         self, tenant_id: uuid.UUID, bill_id: uuid.UUID, tenant_name: str = "BeHazeld"
     ) -> bytes:
         """
-        Retrieve a persisted invoice PDF.  Regenerate on-the-fly if the file
-        is missing (e.g. storage was wiped in dev).
+        Retrieve an invoice PDF. Historical PDFs are backed up once and
+        regenerated with the current branded template on first access.
         """
         self.ensure_sales_tables_available()
         from pathlib import Path
@@ -730,9 +739,25 @@ class SalesService:
             / str(tenant_id)
             / f"{bill.invoice_number}.pdf"
         )
-        if pdf_path.exists():
+        version_path = pdf_path.with_suffix(".pdf.template-version")
+        if (
+            pdf_path.exists()
+            and version_path.exists()
+            and version_path.read_text(encoding="ascii").strip()
+            == report_service.TEMPLATE_VERSION
+        ):
             return pdf_path.read_bytes()
-        # Regenerate and save
+
+        if pdf_path.exists():
+            from shutil import copy2
+
+            legacy_dir = pdf_path.parent / "_legacy"
+            legacy_dir.mkdir(parents=True, exist_ok=True)
+            legacy_path = legacy_dir / pdf_path.name
+            if not legacy_path.exists():
+                copy2(pdf_path, legacy_path)
+
+        # Regenerate with the current template and save its version marker.
         pdf_bytes = report_service.generate_invoice_pdf(bill, tenant_name)
         report_service.save_invoice_pdf(pdf_bytes, tenant_id, bill.invoice_number)
         return pdf_bytes

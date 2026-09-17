@@ -24,6 +24,8 @@ import uuid
 import csv
 import io
 from decimal import Decimal
+from datetime import date
+from app.core.pricing import price_with_gst
 
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
@@ -377,7 +379,9 @@ class InventoryService:
 
             quantity = Decimal("1")
             for variant in missing_variants:
-                unit_cost = variant.cost_price or Decimal("0")
+                # Catalogue cost is entered before GST; stock valuation uses the
+                # actual 5%-GST-inclusive landed cost.
+                unit_cost = price_with_gst(variant.cost_price or Decimal("0"), date.today())
                 ledger_entry = self.repo.append_ledger_entry(
                     tenant_id=tenant_id,
                     product_variant_id=variant.id,

@@ -19,11 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Controller } from 'react-hook-form';
+import { Controller, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 import { useSizes, useColors } from '@/hooks/use-catalog';
 import { prepareProductImageForUpload } from '@/lib/image-upload';
 import type { WizardFormValues } from './create-product-wizard';
+import { addGst } from '@/lib/pricing';
 
 interface VariantRowProps {
   index: number;
@@ -40,6 +41,8 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
   const colorItems = colors.map((c) => ({ value: c.id, label: c.name }));
 
   const variantErrors = errors.variants?.[index];
+  const sellingPrice = useWatch({ control, name: `variants.${index}.selling_price` });
+  const costPrice = useWatch({ control, name: `variants.${index}.cost_price` });
   void register;
 
   return (
@@ -128,6 +131,9 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
             />
           )}
         />
+        {sellingPrice !== '' && Number.isFinite(Number(sellingPrice)) ? (
+          <p className="mt-1 text-[10px] text-stone-500">Final ₹{addGst(Number(sellingPrice)).toFixed(2)}</p>
+        ) : null}
       </div>
 
       {/* Cost Price */}
@@ -150,6 +156,9 @@ export function VariantRow({ index, onRemove, control, register, errors }: Varia
             />
           )}
         />
+        {costPrice !== '' && Number.isFinite(Number(costPrice)) ? (
+          <p className="mt-1 text-[10px] text-stone-500">With GST ₹{addGst(Number(costPrice)).toFixed(2)}</p>
+        ) : null}
       </div>
 
       {/* Fabric (optional) */}

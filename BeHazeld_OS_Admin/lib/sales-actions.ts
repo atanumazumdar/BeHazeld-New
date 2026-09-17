@@ -20,6 +20,11 @@ interface SalesActionResult<T> {
   message?: string;
 }
 
+export interface InvoicePdfData {
+  base64: string;
+  filename: string;
+}
+
 async function getAccessToken(): Promise<string | null> {
   const cookieStore = await cookies();
   return cookieStore.get('access_token')?.value ?? null;
@@ -267,4 +272,41 @@ export async function getSalesBillAction(
     `/api/v1/sales/bills/${billId}`,
     'Failed to load sale bill.',
   );
+}
+
+export async function getInvoicePdfAction(
+  billId: string,
+): Promise<SalesActionResult<InvoicePdfData>> {
+  let response: Response;
+  try {
+    const result = await fetchWithAuth(`/api/v1/sales/bills/${billId}/pdf`, {
+      method: 'GET',
+      cache: 'no-store',
+    });
+    if (!result) {
+      return { success: false, message: 'Session expired. Please sign in again.' };
+    }
+    response = result;
+  } catch {
+    return { success: false, message: 'Unable to reach the server. Please try again.' };
+  }
+
+  if (!response.ok) {
+    return {
+      success: false,
+      message: await readErrorMessage(response, 'Failed to load invoice PDF.'),
+    };
+  }
+
+  const contentDisposition = response.headers.get('Content-Disposition') ?? '';
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  const bytes = await response.arrayBuffer();
+
+  return {
+    success: true,
+    data: {
+      base64: Buffer.from(bytes).toString('base64'),
+      filename: filenameMatch?.[1] ?? `invoice-${billId}.pdf`,
+    },
+  };
 }

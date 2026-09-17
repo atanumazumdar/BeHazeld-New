@@ -26,6 +26,7 @@ directly (same Session, same transaction) we control the single commit point.
 """
 import uuid
 from decimal import Decimal
+from app.core.pricing import gst_rate_for, price_with_gst
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -152,12 +153,13 @@ class PurchaseService:
             total_amount = Decimal("0")
             tax_amount = Decimal("0")
             line_totals: list[Decimal] = []
+            effective_tax_rate = gst_rate_for(req.bill_date)
 
             for line_req in req.lines:
                 line_total = (line_req.quantity * line_req.unit_cost * (
-                    1 + line_req.tax_rate
+                    1 + effective_tax_rate
                 )).quantize(Decimal("0.01"))
-                line_tax = (line_req.quantity * line_req.unit_cost * line_req.tax_rate
+                line_tax = (line_req.quantity * line_req.unit_cost * effective_tax_rate
                             ).quantize(Decimal("0.01"))
                 line_totals.append(line_total)
                 total_amount += line_total
@@ -186,7 +188,7 @@ class PurchaseService:
                     product_variant_id=line_req.product_variant_id,
                     quantity=line_req.quantity,
                     unit_cost=line_req.unit_cost,
-                    tax_rate=line_req.tax_rate,
+                    tax_rate=effective_tax_rate,
                     total_line_amount=line_total,
                 )
 
@@ -198,7 +200,7 @@ class PurchaseService:
                     bin_id=req.bin_id,
                     movement_type=MovementType.PURCHASE_IN,
                     quantity_change=line_req.quantity,   # positive — inward
-                    unit_cost=line_req.unit_cost,
+                    unit_cost=price_with_gst(line_req.unit_cost, req.bill_date),
                     reference_type="purchase_bill",
                     reference_id=bill.id,
                     notes=f"Purchase bill {req.bill_number}",
@@ -214,7 +216,7 @@ class PurchaseService:
                     bin_id=req.bin_id,
                     batch_number=batch_number,
                     initial_quantity=line_req.quantity,
-                    unit_cost=line_req.unit_cost,
+                    unit_cost=price_with_gst(line_req.unit_cost, req.bill_date),
                     purchase_bill_ref=req.bill_number,
                 )
 

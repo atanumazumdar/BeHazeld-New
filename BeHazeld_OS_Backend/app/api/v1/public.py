@@ -34,11 +34,11 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationError
+from app.core.pricing import gst_rate_for, price_with_gst
 from app.db.session import get_db
 from app.models.catalog import ProductVariant
 from app.models.sales import Customer, SalePaymentMode
 from app.repositories.public_repository import PublicRepository
-from app.repositories.sales_repository import SalesRepository
 from app.schemas.public import (
     PaginatedProductsResponse,
     PublicCategoryResponse,
@@ -80,7 +80,7 @@ def _public_variant_response(v, stock_count) -> PublicVariantResponse:
         fabric=v.fabric,
         image_url=v.image_url,
         mrp=v.mrp,
-        selling_price=v.selling_price,
+        selling_price=price_with_gst(Decimal(str(v.selling_price)), date.today()),
         stock_count=stock_count,
         is_available=v.status == "active" and available,
         status=v.status,
@@ -341,13 +341,14 @@ def public_checkout(
             raise ValidationError(f"Variant {item.product_variant_id} is not available")
         quantity = Decimal(item.quantity)
         price = Decimal(str(variant.selling_price)).quantize(Decimal("0.01"))
-        server_total += (quantity * price).quantize(Decimal("0.01"))
+        final_price = price_with_gst(price, date.today())
+        server_total += (quantity * final_price).quantize(Decimal("0.01"))
         line_requests.append(
             CreateSaleBillLineRequest(
                 product_variant_id=variant.id,
                 quantity=quantity,
                 selling_price=price,
-                tax_rate=Decimal("0"),
+                tax_rate=gst_rate_for(date.today()),
                 discount_amount=Decimal("0"),
             )
         )
@@ -379,8 +380,6 @@ def public_checkout(
             address=address,
         )
         location, bin_obj = service._default_sale_location_bin(tenant_id)
-        sequence = SalesRepository(db).count_bills_by_tenant(tenant_id) + 1
-        order_id = f"BEH-{1000 + sequence}"
         sale_request = CreateSaleBillRequest(
             location_id=location.id,
             bin_id=bin_obj.id,
@@ -397,8 +396,6 @@ def public_checkout(
         bill, _metadata = service.create_sale(
             tenant_id=tenant_id,
             req=sale_request,
-            invoice_number_override=order_id,
-            generate_pdf=False,
         )
     except Exception:
         db.rollback()
